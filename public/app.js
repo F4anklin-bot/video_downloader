@@ -107,7 +107,6 @@ function cycleTheme() {
   const order = ['dark', 'light', 'auto'];
   const next = order[(order.indexOf(state.themePref) + 1) % order.length];
   applyTheme(next);
-  toast(next === 'auto' ? 'Thème auto' : next === 'light' ? 'Thème clair' : 'Thème sombre');
 }
 
 function burstConfetti() {
