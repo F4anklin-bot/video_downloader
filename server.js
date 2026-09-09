@@ -1,6 +1,7 @@
 require('dotenv').config();
 
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
 const express = require('express');
 const cors = require('cors');
@@ -35,10 +36,15 @@ const app = express();
 const PORT = Number(process.env.PORT) || 3000;
 const MAX_FILE_BYTES = Number(process.env.MAX_FILE_BYTES) || 524288000;
 const cache = new NodeCache({ stdTTL: 300, checkperiod: 60 });
-const tmpDir = path.join(__dirname, 'tmp');
+const serverless = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
+const tmpDir = serverless
+  ? path.join(os.tmpdir(), 'franklins-tmp')
+  : path.join(__dirname, 'tmp');
 if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir, { recursive: true });
-for (const file of fs.readdirSync(tmpDir)) {
-  try { fs.unlinkSync(path.join(tmpDir, file)); } catch { /* ignore */ }
+if (!serverless) {
+  for (const file of fs.readdirSync(tmpDir)) {
+    try { fs.unlinkSync(path.join(tmpDir, file)); } catch { /* ignore */ }
+  }
 }
 
 app.set('trust proxy', 1);
@@ -398,12 +404,16 @@ app.use((err, _req, res, _next) => {
   return res.status(e.status).json({ success: false, code: e.code, message: e.message });
 });
 
-app.listen(PORT, () => {
-  console.log(`Franklin's prêt sur http://localhost:${PORT}`);
-  ensureBinary().catch((err) => {
-    console.warn('yt-dlp sera téléchargé au premier usage:', err.message);
+module.exports = app;
+
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`Franklin's prêt sur http://localhost:${PORT}`);
+    ensureBinary().catch((err) => {
+      console.warn('yt-dlp sera téléchargé au premier usage:', err.message);
+    });
+    ensureFfmpeg().catch((err) => {
+      console.warn('ffmpeg sera téléchargé au premier usage:', err.message);
+    });
   });
-  ensureFfmpeg().catch((err) => {
-    console.warn('ffmpeg sera téléchargé au premier usage:', err.message);
-  });
-});
+}

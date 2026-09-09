@@ -1,9 +1,13 @@
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
 const zlib = require('zlib');
 const YTDlpWrap = require('yt-dlp-wrap').default;
 
-const binDir = path.join(__dirname, '..', 'bin');
+const serverless = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
+const binDir = serverless
+  ? path.join(os.tmpdir(), 'franklins-bin')
+  : path.join(__dirname, '..', 'bin');
 const binaryName = process.platform === 'win32' ? 'yt-dlp.exe' : 'yt-dlp';
 const binPath = path.join(binDir, binaryName);
 const ffmpegName = process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg';
@@ -22,7 +26,16 @@ function ffmpegAsset() {
   return 'ffmpeg-linux-x64.gz';
 }
 
+function systemFfmpeg() {
+  const candidates = process.platform === 'win32'
+    ? []
+    : ['/usr/bin/ffmpeg', '/usr/local/bin/ffmpeg'];
+  return candidates.find((p) => fs.existsSync(p)) || null;
+}
+
 async function ensureFfmpeg() {
+  const system = systemFfmpeg();
+  if (system) return system;
   if (!fs.existsSync(binDir)) fs.mkdirSync(binDir, { recursive: true });
   const stat = fs.existsSync(ffmpegPath) ? fs.statSync(ffmpegPath) : null;
   if (stat && stat.size > 1000000) return ffmpegPath;
@@ -82,8 +95,9 @@ function extraArgs() {
     '--extractor-args',
     'youtube:player_client=android,tv,web',
   ];
-  if (fs.existsSync(ffmpegPath)) {
-    args.push('--ffmpeg-location', ffmpegPath);
+  const ffmpeg = systemFfmpeg() || (fs.existsSync(ffmpegPath) ? ffmpegPath : null);
+  if (ffmpeg) {
+    args.push('--ffmpeg-location', ffmpeg);
   }
   if (process.env.YTDLP_COOKIES && fs.existsSync(process.env.YTDLP_COOKIES)) {
     args.push('--cookies', process.env.YTDLP_COOKIES);
