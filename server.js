@@ -106,13 +106,19 @@ const limiter = rateLimit({
 });
 app.use('/api/', limiter);
 
-app.use(
+  app.use(
   express.static(path.join(__dirname, 'public'), {
-    maxAge: process.env.NODE_ENV === 'production' ? '7d' : 0,
+    etag: true,
+    lastModified: true,
+    maxAge: 0,
     setHeaders(res, filePath) {
       if (filePath.endsWith('sw.js')) {
-        res.setHeader('Cache-Control', 'no-cache');
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
         res.setHeader('Service-Worker-Allowed', '/');
+        return;
+      }
+      if (/\.(html|css|js)$/i.test(filePath) || filePath.endsWith('manifest.json')) {
+        res.setHeader('Cache-Control', 'no-cache, must-revalidate');
       }
     },
   }),
@@ -390,11 +396,13 @@ app.get('/api/file', async (req, res, next) => {
 });
 
 app.get('/offline', (_req, res) => {
+  res.setHeader('Cache-Control', 'no-cache, must-revalidate');
   res.sendFile(path.join(__dirname, 'public', 'offline.html'));
 });
 
 app.get('*', (req, res, next) => {
   if (req.path.startsWith('/api/')) return next();
+  res.setHeader('Cache-Control', 'no-cache, must-revalidate');
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 

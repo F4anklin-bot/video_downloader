@@ -82,17 +82,25 @@ function resolvedTheme(pref) {
   return pref === 'light' ? 'light' : 'dark';
 }
 
-function applyTheme(pref) {
+function applyTheme(pref, { animate = true } = {}) {
   state.themePref = pref;
   localStorage.setItem('franklins-theme', pref);
   const resolved = resolvedTheme(pref);
-  document.documentElement.dataset.theme = resolved;
-  document.documentElement.dataset.themePref = pref;
-  const meta = $('themeColor');
-  if (meta) meta.setAttribute('content', resolved === 'light' ? '#f3efe6' : '#070708');
-  document.querySelectorAll('#themePref button').forEach((b) => {
-    b.classList.toggle('is-on', b.dataset.theme === pref);
-  });
+  const paint = () => {
+    document.documentElement.dataset.theme = resolved;
+    document.documentElement.dataset.themePref = pref;
+    const meta = $('themeColor');
+    if (meta) meta.setAttribute('content', resolved === 'light' ? '#f3efe6' : '#070708');
+    document.querySelectorAll('#themePref button').forEach((b) => {
+      b.classList.toggle('is-on', b.dataset.theme === pref);
+    });
+  };
+  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (animate && !reduce && document.startViewTransition) {
+    document.startViewTransition(paint);
+  } else {
+    paint();
+  }
 }
 
 function cycleTheme() {
@@ -586,7 +594,7 @@ function wire() {
   renderPlatforms();
   renderHistory();
   bindQualityDefault();
-  applyTheme(state.themePref);
+  applyTheme(state.themePref, { animate: false });
   renderStats();
   $('greeting').textContent = hourGreeting();
 

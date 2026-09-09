@@ -1,3 +1,18 @@
+@property --bg { syntax: "<color>"; inherits: true; initial-value: #070708; }
+@property --bg-soft { syntax: "<color>"; inherits: true; initial-value: #0d0d10; }
+@property --elev { syntax: "<color>"; inherits: true; initial-value: #121214; }
+@property --text { syntax: "<color>"; inherits: true; initial-value: #f4f4f2; }
+@property --mute { syntax: "<color>"; inherits: true; initial-value: #8e8e87; }
+@property --ink { syntax: "<color>"; inherits: true; initial-value: #14150c; }
+@property --lime { syntax: "<color>"; inherits: true; initial-value: #d4f04f; }
+@property --glass { syntax: "<color>"; inherits: true; initial-value: #121214; }
+@property --dock-bg { syntax: "<color>"; inherits: true; initial-value: #101012; }
+@property --toast-bg { syntax: "<color>"; inherits: true; initial-value: #161618; }
+@property --seg-bg { syntax: "<color>"; inherits: true; initial-value: #0a0a0c; }
+@property --thumb-bg { syntax: "<color>"; inherits: true; initial-value: #101014; }
+@property --orb-a { syntax: "<color>"; inherits: true; initial-value: #3d4a18; }
+@property --orb-b { syntax: "<color>"; inherits: true; initial-value: #1a2430; }
+
 :root {
   --bg: #070708;
   --bg-soft: #0d0d10;
@@ -61,7 +76,7 @@ html[data-theme="dark"] { color-scheme: dark; }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 html, body { min-height: 100%; }
-html { background: var(--bg); transition: background 0.35s var(--ease); -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+html { background: var(--bg); transition: background 1.6s var(--ease), color 1.6s var(--ease); -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 body {
   font-family: var(--font);
   color: var(--text);
@@ -69,6 +84,7 @@ body {
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   overflow-x: hidden;
+  transition: background 1.6s var(--ease), color 1.6s var(--ease);
 }
 img { max-width: 100%; display: block; }
 button, input { font: inherit; color: inherit; }
@@ -249,8 +265,94 @@ html.booting .app {
   place-items: center;
   color: var(--text);
   -webkit-tap-highlight-color: transparent;
+  transition: background 1.6s var(--ease), border-color 1.6s var(--ease), color 1.6s var(--ease);
 }
 .icon-btn:active { transform: scale(0.96); background: var(--glass-2); }
+.theme-toggle {
+  overflow: visible;
+  view-transition-name: theme-toggle;
+}
+.theme-sky {
+  position: relative;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+}
+.theme-sky svg {
+  position: absolute;
+  inset: 0;
+  width: 22px;
+  height: 22px;
+  overflow: visible;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.moon-disc { fill: currentColor; }
+.moon-crater { fill: var(--bg); opacity: 0.38; }
+.sun-core { fill: currentColor; }
+.sun-group, .moon-group { transform-origin: 12px 12px; transform-box: fill-box; }
+
+html[data-theme="dark"] .icon-moon {
+  animation: moonRise 1s var(--ease) both;
+}
+html[data-theme="dark"] .moon-group {
+  animation: moonSway 2.2s ease-in-out 1s both;
+}
+html[data-theme="dark"] .icon-sun {
+  animation: sunSet 0.7s var(--ease) both;
+  pointer-events: none;
+}
+html[data-theme="light"] .icon-moon {
+  animation: moonSet 0.85s var(--ease) both;
+  pointer-events: none;
+}
+html[data-theme="light"] .icon-sun {
+  animation: sunRise 0.8s var(--ease) both, sunSpin 3s cubic-bezier(0.33, 0.1, 0.25, 1) 0.8s both;
+}
+html[data-theme="light"] .sun-rays {
+  transform-origin: 12px 12px;
+  animation: raysOut 0.75s var(--ease) 0.18s both;
+}
+
+@keyframes moonRise {
+  from { transform: translate(9px, 12px) rotate(42deg) scale(0.2); opacity: 0; }
+  58% { transform: translate(-1px, -2px) rotate(-8deg) scale(1.1); opacity: 1; }
+  to { transform: none; opacity: 1; }
+}
+@keyframes moonSway {
+  0% { transform: rotate(0deg); }
+  35% { transform: rotate(-10deg); }
+  70% { transform: rotate(6deg); }
+  100% { transform: rotate(0deg); }
+}
+@keyframes moonSet {
+  from { transform: none; opacity: 1; }
+  to { transform: translate(-11px, 13px) rotate(-55deg) scale(0.18); opacity: 0; }
+}
+@keyframes sunRise {
+  from { transform: translate(-8px, 13px) rotate(-110deg) scale(0.18); opacity: 0; }
+  68% { transform: scale(1.16) rotate(14deg); opacity: 1; }
+  to { transform: rotate(0deg) scale(1); opacity: 1; }
+}
+@keyframes sunSet {
+  from { transform: none; opacity: 1; }
+  to { transform: translate(11px, -13px) rotate(90deg) scale(0.15); opacity: 0; }
+}
+@keyframes sunSpin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+@keyframes raysOut {
+  from { transform: scale(0.35); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 1.6s;
+  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+}
 
 .install-btn {
   display: inline-flex;
@@ -343,7 +445,7 @@ html.booting .app {
   background: var(--glass);
   border: 1px solid var(--line);
   backdrop-filter: blur(18px);
-  transition: border-color 0.3s var(--ease), box-shadow 0.3s var(--ease), transform 0.4s var(--ease);
+  transition: border-color 0.3s var(--ease), box-shadow 0.3s var(--ease), transform 0.4s var(--ease), background 1.6s var(--ease);
 }
 .field:focus-within {
   border-color: rgba(212, 240, 79, 0.45);
@@ -500,6 +602,7 @@ html.booting .app {
   background: linear-gradient(180deg, var(--glass-2), var(--glass));
   border: 1px solid var(--line);
   box-shadow: var(--shadow);
+  transition: background 1.6s var(--ease), border-color 1.6s var(--ease);
 }
 .thumb-wrap {
   position: relative;
@@ -725,6 +828,7 @@ html.booting .app {
   width: 100%;
   animation: rise 0.45s var(--ease) both;
   -webkit-tap-highlight-color: transparent;
+  transition: background 1.6s var(--ease), border-color 1.6s var(--ease);
 }
 .hist-item img, .hist-ph {
   width: 72px;
@@ -763,6 +867,7 @@ html.booting .app {
   border-radius: 18px;
   border: 1px solid var(--line);
   background: var(--glass);
+  transition: background 1.6s var(--ease), border-color 1.6s var(--ease);
 }
 .setting-card.stats-card {
   flex-direction: row;
@@ -815,6 +920,7 @@ html.booting .app {
   border-top: 1px solid var(--line-strong);
   backdrop-filter: blur(22px) saturate(1.4);
   -webkit-backdrop-filter: blur(22px) saturate(1.4);
+  transition: background 1.6s var(--ease), border-color 1.6s var(--ease);
 }
 .dock .nav-btn {
   flex: 1;
@@ -1054,9 +1160,6 @@ html.booting .app {
 }
 
 .theme-label { display: none; }
-html[data-theme="light"] .icon-moon { display: none; }
-html[data-theme="light"] .icon-sun { display: block !important; }
-html[data-theme="dark"] .icon-sun { display: none; }
 .fun-row {
   display: flex;
   flex-wrap: wrap;

@@ -1,4 +1,4 @@
-const CACHE = 'franklins-shell-v5';
+const CACHE = 'franklins-shell-v6';
 const SHELL = ['/', '/index.html', '/style.css', '/app.js', '/theme.js', '/manifest.json', '/offline.html', '/icons/icon.svg'];
 
 self.addEventListener('install', (event) => {
@@ -25,7 +25,7 @@ self.addEventListener('fetch', (event) => {
   if (url.pathname.startsWith('/api/')) return;
 
   event.respondWith(
-    fetch(request)
+    fetch(request, { cache: 'no-store' })
       .then((res) => {
         if (res.ok && request.destination !== 'document') {
           const copy = res.clone();
