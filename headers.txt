@@ -1,0 +1,25 @@
+HTTP/1.1 422 Unprocessable Entity
+Content-Security-Policy: default-src 'self';base-uri 'self';font-src 'self' https://fonts.gstatic.com data:;form-action 'self';frame-ancestors 'self';img-src 'self' data: blob: https:;object-src 'none';script-src 'self';script-src-attr 'none';style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;upgrade-insecure-requests;media-src 'self' blob: https:;connect-src 'self';manifest-src 'self';worker-src 'self'
+Cross-Origin-Opener-Policy: same-origin
+Cross-Origin-Resource-Policy: same-origin
+Origin-Agent-Cluster: ?1
+Referrer-Policy: no-referrer
+Strict-Transport-Security: max-age=31536000; includeSubDomains
+X-Content-Type-Options: nosniff
+X-DNS-Prefetch-Control: off
+X-Download-Options: noopen
+X-Frame-Options: SAMEORIGIN
+X-Permitted-Cross-Domain-Policies: none
+X-XSS-Protection: 0
+Vary: Origin, Accept-Encoding
+RateLimit-Policy: 40;w=60
+RateLimit-Limit: 40
+RateLimit-Remaining: 39
+RateLimit-Reset: 60
+Content-Type: application/json; charset=utf-8
+Content-Length: 119
+ETag: W/"77-DkLCWiX/y5FOm+B9CnQM7BBwdag"
+Date: Wed, 09 Sep 2026 19:33:57 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
