@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content" />
   <meta name="theme-color" content="#070708" id="themeColor" />
   <meta name="color-scheme" content="dark light" />
   <meta name="description" content="Franklin's — enregistrez vos vidéos TikTok, Instagram, YouTube et plus, en une seule app." />
@@ -60,15 +60,15 @@
           <span>Réglages</span>
         </button>
       </nav>
-      <button class="install-btn" id="themeBtn" type="button" aria-label="Changer de thème">
-        <svg class="icon-moon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M15 3.5A8.5 8.5 0 1 1 8.5 21 7 7 0 0 0 15 3.5Z"/></svg>
-        <svg class="icon-sun" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" hidden><circle cx="12" cy="12" r="4"/><path d="M12 3v2M12 19v2M5 12H3M21 12h-2M6.2 6.2l1.4 1.4M16.4 16.4l1.4 1.4M17.8 6.2l-1.4 1.4M7.6 16.4l-1.4 1.4"/></svg>
-        <span class="theme-label">Thème</span>
-      </button>
-      <button class="install-btn" id="installBtn" type="button" hidden>
-        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 4v10M8 10l4 4 4-4"/><path d="M5 18h14"/></svg>
-        Installer
-      </button>
+      <div class="rail-actions">
+        <button class="icon-btn" id="themeBtn" type="button" aria-label="Changer de thème">
+          <svg class="icon-moon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M15 3.5A8.5 8.5 0 1 1 8.5 21 7 7 0 0 0 15 3.5Z"/></svg>
+          <svg class="icon-sun" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" hidden><circle cx="12" cy="12" r="4"/><path d="M12 3v2M12 19v2M5 12H3M21 12h-2M6.2 6.2l1.4 1.4M16.4 16.4l1.4 1.4M17.8 6.2l-1.4 1.4M7.6 16.4l-1.4 1.4"/></svg>
+        </button>
+        <button class="icon-btn" id="installBtn" type="button" hidden aria-label="Installer">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 4v10M8 10l4 4 4-4"/><path d="M5 18h14"/></svg>
+        </button>
+      </div>
     </aside>
 
     <main class="stage">
@@ -85,7 +85,7 @@
             <span class="field-icon" aria-hidden="true">
               <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M10 6H7a3 3 0 0 0 0 6h3M14 18h3a3 3 0 0 0 0-6h-3"/><path d="M8 12h8"/></svg>
             </span>
-            <input id="url" name="url" type="text" inputmode="url" enterkeyhint="go" placeholder="Collez un lien TikTok, Instagram, YouTube…" />
+            <input id="url" name="url" type="text" inputmode="url" enterkeyhint="go" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Collez un lien…" />
             <div class="field-actions">
               <span class="platform-chip" id="platformChip" hidden></span>
               <button class="ghost-btn" id="pasteBtn" type="button">Coller</button>
@@ -99,7 +99,66 @@
             <span class="btn-spinner" hidden></span>
           </button>
         </form>
-        <p class="drop-hint" id="dropHint">Déposez un lien n’importe où</p>
+        <p class="drop-hint desktop-only" id="dropHint">Déposez un lien n’importe où</p>
+
+        <aside class="peek" id="peek">
+          <div class="peek-empty" id="peekEmpty">
+            <div class="film">
+              <span></span><span></span><span></span>
+            </div>
+            <p>La prévisualisation s’affiche ici dès qu’un lien est reconnu.</p>
+          </div>
+          <section class="sheet" id="result" hidden>
+            <div class="preview-card" id="previewCard">
+              <div class="thumb-wrap">
+                <img id="thumb" alt="" referrerpolicy="no-referrer" />
+                <button class="play-ghost" id="previewPlay" type="button" aria-label="Aperçu">
+                  <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M9 7.5v9l8-4.5-8-4.5Z"/></svg>
+                </button>
+                <span class="duration" id="duration"></span>
+              </div>
+              <div class="meta">
+                <div class="meta-top">
+                  <span class="platform-chip is-solid" id="resultChip"></span>
+                  <span class="quality-tag" id="qualityTag"></span>
+                </div>
+                <h2 id="title"></h2>
+                <p class="author" id="author"></p>
+                <div class="fun-row">
+                  <button class="ghost-btn" id="copyLinkBtn" type="button">Copier</button>
+                  <button class="ghost-btn" id="luckyBtn" type="button">Citation</button>
+                </div>
+                <div class="quality-row" id="qualityRow" role="radiogroup" aria-label="Qualité"></div>
+                <div class="actions">
+                  <button class="primary download-btn" id="downloadBtn" type="button">
+                    <span class="dl-idle">
+                      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 4v10M8 10l4 4 4-4"/><path d="M5 18h14"/></svg>
+                      Télécharger
+                    </span>
+                    <span class="dl-progress" hidden>
+                      <svg class="ring" viewBox="0 0 120 120" width="28" height="28">
+                        <circle class="ring-bg" cx="60" cy="60" r="52" />
+                        <circle class="ring-fg" id="ringFg" cx="60" cy="60" r="52" />
+                      </svg>
+                      <span id="dlPercent">0%</span>
+                    </span>
+                    <span class="dl-done" hidden>
+                      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12.5 10 17l9-10"/></svg>
+                      Enregistré
+                    </span>
+                  </button>
+                </div>
+                <div class="transfer" id="transfer" hidden>
+                  <div class="transfer-bar"><i id="transferFill"></i></div>
+                  <div class="transfer-meta">
+                    <span id="transferSize">0 Mo</span>
+                    <span id="transferSpeed"></span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+        </aside>
 
         <ul class="platforms" id="platforms" aria-label="Plateformes prises en charge"></ul>
       </section>
@@ -166,79 +225,20 @@
         </div>
       </section>
     </main>
-
-    <aside class="peek" id="peek">
-      <div class="peek-empty" id="peekEmpty">
-        <div class="film">
-          <span></span><span></span><span></span>
-        </div>
-        <p>La prévisualisation s’affiche ici dès qu’un lien est reconnu.</p>
-      </div>
-      <section class="sheet" id="result" hidden>
-        <div class="preview-card" id="previewCard">
-          <div class="thumb-wrap">
-            <img id="thumb" alt="" referrerpolicy="no-referrer" />
-            <button class="play-ghost" id="previewPlay" type="button" aria-label="Aperçu">
-              <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M9 7.5v9l8-4.5-8-4.5Z"/></svg>
-            </button>
-            <span class="duration" id="duration"></span>
-          </div>
-          <div class="meta">
-            <div class="meta-top">
-              <span class="platform-chip is-solid" id="resultChip"></span>
-              <span class="quality-tag" id="qualityTag"></span>
-            </div>
-              <h2 id="title"></h2>
-              <p class="author" id="author"></p>
-              <div class="fun-row">
-                <button class="ghost-btn" id="copyLinkBtn" type="button">Copier le lien</button>
-                <button class="ghost-btn" id="luckyBtn" type="button">Citation</button>
-              </div>
-            <div class="quality-row" id="qualityRow" role="radiogroup" aria-label="Qualité"></div>
-            <div class="actions">
-              <button class="primary download-btn" id="downloadBtn" type="button">
-                <span class="dl-idle">
-                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 4v10M8 10l4 4 4-4"/><path d="M5 18h14"/></svg>
-                  Télécharger
-                </span>
-                <span class="dl-progress" hidden>
-                  <svg class="ring" viewBox="0 0 120 120" width="28" height="28">
-                    <circle class="ring-bg" cx="60" cy="60" r="52" />
-                    <circle class="ring-fg" id="ringFg" cx="60" cy="60" r="52" />
-                  </svg>
-                  <span id="dlPercent">0%</span>
-                </span>
-                <span class="dl-done" hidden>
-                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12.5 10 17l9-10"/></svg>
-                  Enregistré
-                </span>
-              </button>
-            </div>
-            <div class="transfer" id="transfer" hidden>
-              <div class="transfer-bar"><i id="transferFill"></i></div>
-              <div class="transfer-meta">
-                <span id="transferSize">0 Mo</span>
-                <span id="transferSpeed"></span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-    </aside>
   </div>
 
   <nav class="dock" aria-label="Navigation mobile">
     <button class="nav-btn is-active" data-tab="home" type="button">
       <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-5v-6H10v6H5a1 1 0 0 1-1-1v-9.5Z"/></svg>
-      Accueil
+      <span>Accueil</span>
     </button>
     <button class="nav-btn" data-tab="history" type="button">
       <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8"/><path d="M12 8v4.5L15 15"/></svg>
-      Récents
+      <span>Récents</span>
     </button>
     <button class="nav-btn" data-tab="settings" type="button">
       <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M12 4v2M12 18v2M4 12h2M18 12h2M6.3 6.3l1.4 1.4M16.3 16.3l1.4 1.4M17.7 6.3l-1.4 1.4M7.7 16.3l-1.4 1.4"/></svg>
-      Réglages
+      <span>Réglages</span>
     </button>
   </nav>
 

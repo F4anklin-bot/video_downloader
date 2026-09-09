@@ -1,4 +1,4 @@
-const CACHE = 'franklins-shell-v3';
+const CACHE = 'franklins-shell-v4';
 const SHELL = ['/', '/index.html', '/style.css', '/app.js', '/theme.js', '/manifest.json', '/offline.html', '/icons/icon.svg'];
 
 self.addEventListener('install', (event) => {

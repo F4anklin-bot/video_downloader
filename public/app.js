@@ -197,6 +197,7 @@ function setTab(id) {
   document.querySelectorAll('.view').forEach((v) => v.classList.toggle('is-active', v.dataset.view === id));
   document.querySelectorAll('.nav-btn').forEach((b) => b.classList.toggle('is-active', b.dataset.tab === id));
   $('peek').classList.toggle('is-away', id !== 'home');
+  window.scrollTo({ top: 0, behavior: 'auto' });
 }
 
 function renderPlatforms() {
@@ -256,7 +257,12 @@ function renderPreview(info) {
   $('result').hidden = false;
   $('peek').classList.add('has-result');
   resetDownloadUi();
-}
+  if (window.matchMedia('(max-width: 1179px)').matches) {
+    requestAnimationFrame(() => {
+      const top = $('peek').getBoundingClientRect().top + window.scrollY - 12;
+      window.scrollTo({ top, behavior: 'smooth' });
+    });
+  }
 
 function resetDownloadUi() {
   const btn = $('downloadBtn');
