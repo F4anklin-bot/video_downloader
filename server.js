@@ -63,6 +63,13 @@ app.use(
         defaultSrc: ["'self'"],
         imgSrc: ["'self'", 'data:', 'blob:', 'https:'],
         mediaSrc: ["'self'", 'blob:', 'https:'],
+        frameSrc: [
+          "'self'",
+          'https://www.youtube.com',
+          'https://www.youtube-nocookie.com',
+          'https://player.vimeo.com',
+          'https://www.dailymotion.com',
+        ],
         connectSrc: ["'self'"],
         scriptSrc: ["'self'"],
         styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
@@ -159,6 +166,7 @@ function publicInfo(data) {
     videoUrl: `/api/file?url=${encodeURIComponent(data.sourceUrl)}&quality=${encodeURIComponent(
       data._quality || 'best',
     )}`,
+    previewUrl: `/api/file?url=${encodeURIComponent(data.sourceUrl)}&quality=fast&inline=1`,
     thumbnail: data.thumbnail,
     title: data.title,
     author: data.author,
@@ -173,10 +181,11 @@ function publicInfo(data) {
   };
 }
 
-function disposition(filename) {
+function disposition(filename, inline = false) {
   const safe = String(filename || 'video.mp4').replace(/["\\]/g, '_');
   const encoded = encodeURIComponent(safe);
-  return `attachment; filename="${safe}"; filename*=UTF-8''${encoded}`;
+  const kind = inline ? 'inline' : 'attachment';
+  return `${kind}; filename="${safe}"; filename*=UTF-8''${encoded}`;
 }
 
 function canProxy(data) {
@@ -207,7 +216,7 @@ async function pipeAxios(data, req, res) {
 
   res.status(200);
   res.setHeader('Content-Type', upstream.headers['content-type'] || `video/${data.ext || 'mp4'}`);
-  res.setHeader('Content-Disposition', disposition(data.filename));
+  res.setHeader('Content-Disposition', disposition(data.filename, res.locals.inline));
   res.setHeader('Cache-Control', 'no-store');
   if (length) res.setHeader('Content-Length', String(length));
   res.setHeader('X-Filename', encodeURIComponent(data.filename));
@@ -225,7 +234,7 @@ async function pipeAxios(data, req, res) {
 function sendFileHeaders(res, data, size) {
   res.status(200);
   res.setHeader('Content-Type', `video/${data.ext || 'mp4'}`);
-  res.setHeader('Content-Disposition', disposition(data.filename));
+  res.setHeader('Content-Disposition', disposition(data.filename, res.locals.inline));
   res.setHeader('Cache-Control', 'no-store');
   res.setHeader('X-Filename', encodeURIComponent(data.filename));
   if (size) res.setHeader('Content-Length', String(size));
@@ -359,6 +368,7 @@ app.post('/api/download', async (req, res, next) => {
 
 app.get('/api/file', async (req, res, next) => {
   try {
+    res.locals.inline = req.query.inline === '1' || req.query.preview === '1';
     const url = normalizeUrl(req.query.url);
     const quality = req.query.quality || 'best';
     const data = await extractMedia(url, quality);

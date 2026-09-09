@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="fr" class="booting">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content" />
@@ -22,12 +22,17 @@
   <link rel="stylesheet" href="/style.css" />
 </head>
 <body>
-  <div class="boot" id="boot" aria-hidden="true">
-    <div class="boot-mark">
-      <svg viewBox="0 0 64 64" width="64" height="64">
-        <circle cx="32" cy="32" r="18" fill="none" stroke="currentColor" stroke-width="4" />
-        <circle cx="32" cy="32" r="5" fill="currentColor" />
+  <div class="boot" id="boot">
+    <div class="boot-stage">
+      <span class="boot-flash" aria-hidden="true"></span>
+      <svg class="logo-f" viewBox="0 0 80 80" aria-hidden="true">
+        <g fill="currentColor">
+          <rect class="f-stem" x="18" y="14" width="14" height="52" rx="5" />
+          <rect class="f-top" x="18" y="14" width="46" height="14" rx="5" />
+          <rect class="f-mid" x="18" y="36" width="34" height="13" rx="5" />
+        </g>
       </svg>
+      <p class="boot-word">Franklin's</p>
     </div>
   </div>
 
@@ -39,9 +44,10 @@
     <aside class="rail">
       <a class="brand" href="/" aria-label="Franklin's">
         <span class="brand-mark" aria-hidden="true">
-          <svg viewBox="0 0 32 32" width="28" height="28">
-            <circle cx="16" cy="16" r="10" fill="none" stroke="currentColor" stroke-width="2.4" />
-            <circle cx="16" cy="16" r="3" fill="currentColor" />
+          <svg viewBox="0 0 32 32" width="22" height="22">
+            <rect x="7" y="5.5" width="5.5" height="21" rx="2" fill="currentColor" />
+            <rect x="7" y="5.5" width="18.5" height="5.5" rx="2" fill="currentColor" />
+            <rect x="7" y="14.5" width="13.5" height="5.2" rx="2" fill="currentColor" />
           </svg>
         </span>
         <span class="brand-word">Franklin's</span>
@@ -110,10 +116,17 @@
           </div>
           <section class="sheet" id="result" hidden>
             <div class="preview-card" id="previewCard">
-              <div class="thumb-wrap">
+              <div class="thumb-wrap" id="thumbWrap">
                 <img id="thumb" alt="" referrerpolicy="no-referrer" />
-                <button class="play-ghost" id="previewPlay" type="button" aria-label="Aperçu">
-                  <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M9 7.5v9l8-4.5-8-4.5Z"/></svg>
+                <video id="previewVideo" playsinline webkit-playsinline preload="none"></video>
+                <iframe class="preview-frame" id="previewFrame" hidden allow="autoplay; fullscreen; encrypted-media; picture-in-picture" allowfullscreen title="Aperçu vidéo"></iframe>
+                <div class="preview-wait" id="previewWait" hidden>
+                  <span class="btn-spinner"></span>
+                  <span>Chargement…</span>
+                </div>
+                <button class="play-ghost" id="previewPlay" type="button" aria-label="Lire l’aperçu">
+                  <svg class="icon-play" viewBox="0 0 24 24" width="28" height="28" fill="currentColor"><path d="M9 7.5v9l8-4.5-8-4.5Z"/></svg>
+                  <svg class="icon-pause" viewBox="0 0 24 24" width="26" height="26" fill="currentColor" hidden><path d="M8 7h3v10H8V7Zm5 0h3v10h-3V7Z"/></svg>
                 </button>
                 <span class="duration" id="duration"></span>
               </div>
@@ -244,7 +257,6 @@
 
   <canvas id="confetti" class="confetti" aria-hidden="true"></canvas>
   <div class="toasts" id="toasts"></div>
-  <video id="previewVideo" playsinline hidden></video>
 
   <script src="/app.js" defer></script>
 </body>

@@ -21,6 +21,7 @@ const state = {
   downloading: false,
   deferredPrompt: null,
   themePref: localStorage.getItem('franklins-theme') || 'dark',
+  previewTimer: 0,
   logoHits: 0,
 };
 
@@ -197,6 +198,7 @@ function setTab(id) {
   document.querySelectorAll('.view').forEach((v) => v.classList.toggle('is-active', v.dataset.view === id));
   document.querySelectorAll('.nav-btn').forEach((b) => b.classList.toggle('is-active', b.dataset.tab === id));
   $('peek').classList.toggle('is-away', id !== 'home');
+  if (id !== 'home') stopPreview();
   window.scrollTo({ top: 0, behavior: 'auto' });
 }
 
@@ -257,12 +259,14 @@ function renderPreview(info) {
   $('result').hidden = false;
   $('peek').classList.add('has-result');
   resetDownloadUi();
+  stopPreview();
   if (window.matchMedia('(max-width: 1179px)').matches) {
     requestAnimationFrame(() => {
       const top = $('peek').getBoundingClientRect().top + window.scrollY - 12;
       window.scrollTo({ top, behavior: 'smooth' });
     });
   }
+}
 
 function resetDownloadUi() {
   const btn = $('downloadBtn');
@@ -309,10 +313,6 @@ function markDone() {
   setTimeout(resetDownloadUi, 1800);
 }
 
-function infoDuration() {
-  return Number(state.info?.duration) || 0;
-}
-
 async function analyze(url) {
   const detected = detect(url);
   const clean = detected.url && /^https?:\/\//i.test(detected.url) ? detected.url : url;
@@ -321,6 +321,7 @@ async function analyze(url) {
     return;
   }
   state.sourceUrl = clean;
+  stopPreview();
   setAnalyzing(true);
   try {
     const res = await fetch('/api/info', {
@@ -340,8 +341,114 @@ async function analyze(url) {
   }
 }
 
+function infoDuration() {
+  return Number(state.info?.duration) || 0;
+}
+
+function embedSrc(platform, url) {
+  const u = String(url || '');
+  if (platform === 'youtube') {
+    const id = u.match(/[?&]v=([^&]+)/)?.[1] || u.match(/youtu\.be\/([^?&/]+)/)?.[1];
+    if (id) return `https://www.youtube-nocookie.com/embed/${encodeURIComponent(id)}?autoplay=1&rel=0&modestbranding=1`;
+  }
+  if (platform === 'vimeo') {
+    const id = u.match(/vimeo\.com\/(?:video\/)?(\d+)/)?.[1];
+    if (id) return `https://player.vimeo.com/video/${id}?autoplay=1`;
+  }
+  if (platform === 'dailymotion') {
+    const id = u.match(/(?:video|dai\.ly)\/([a-zA-Z0-9]+)/)?.[1];
+    if (id) return `https://www.dailymotion.com/embed/video/${id}?autoplay=1`;
+  }
+  return null;
+}
+
+function stopPreview() {
+  const wrap = $('thumbWrap');
+  const video = $('previewVideo');
+  const frame = $('previewFrame');
+  const wait = $('previewWait');
+  if (state.previewTimer) {
+    clearTimeout(state.previewTimer);
+    state.previewTimer = 0;
+  }
+  if (!wrap || !video) return;
+  wrap.classList.remove('is-playing', 'is-loading', 'is-embed');
+  if (wait) wait.hidden = true;
+  video.pause();
+  video.removeAttribute('src');
+  video.load();
+  if (frame) {
+    frame.hidden = true;
+    frame.removeAttribute('src');
+  }
+  const play = $('previewPlay');
+  if (play) {
+    play.querySelector('.icon-play').hidden = false;
+    play.querySelector('.icon-pause').hidden = true;
+    play.setAttribute('aria-label', 'Lire l’aperçu');
+  }
+}
+
+function startPreview() {
+  if (!state.info || !state.sourceUrl) return;
+  const wrap = $('thumbWrap');
+  const video = $('previewVideo');
+  const frame = $('previewFrame');
+  const wait = $('previewWait');
+  const embed = embedSrc(state.info.platform, state.sourceUrl);
+
+  if (wrap.classList.contains('is-loading')) {
+    stopPreview();
+    return;
+  }
+
+  if (wrap.classList.contains('is-playing')) {
+    if (embed) {
+      stopPreview();
+      return;
+    }
+    if (!video.paused) {
+      video.pause();
+      return;
+    }
+    video.play().catch(() => {});
+    return;
+  }
+
+  stopPreview();
+  wrap.classList.add('is-loading');
+  wait.hidden = false;
+
+  if (embed) {
+    wrap.classList.add('is-playing', 'is-embed');
+    wait.hidden = true;
+    wrap.classList.remove('is-loading');
+    frame.hidden = false;
+    frame.src = embed;
+    return;
+  }
+
+  const src = state.info.previewUrl || `/api/file?url=${encodeURIComponent(state.sourceUrl)}&quality=fast&inline=1`;
+  video.controls = true;
+  video.src = src;
+  state.previewTimer = window.setTimeout(() => {
+    if (wrap.classList.contains('is-loading')) {
+      toast('Aperçu trop long à charger', 'error');
+      stopPreview();
+    }
+  }, 25000);
+  const play = video.play();
+  if (play && typeof play.then === 'function') {
+    play.catch(() => {
+      toast('Aperçu indisponible pour cette vidéo', 'error');
+      stopPreview();
+    });
+  }
+}
+
 function downloadCurrent() {
   if (!state.info || state.downloading) return;
+  stopPreview();
   const info = state.info;
   const url = `/api/file?url=${encodeURIComponent(state.sourceUrl)}&quality=${encodeURIComponent(state.quality)}`;
   state.downloading = true;
@@ -546,9 +653,29 @@ function wire() {
     }
   });
 
-  $('previewPlay').addEventListener('click', () => {
-    if (!state.info) return;
-    toast(QUOTES[Math.floor(Math.random() * QUOTES.length)]);
+  $('previewPlay').addEventListener('click', startPreview);
+
+  const previewVideo = $('previewVideo');
+  previewVideo.addEventListener('playing', () => {
+    const wrap = $('thumbWrap');
+    wrap.classList.add('is-playing');
+    wrap.classList.remove('is-loading');
+    $('previewWait').hidden = true;
+    if (state.previewTimer) {
+      clearTimeout(state.previewTimer);
+      state.previewTimer = 0;
+    }
+  });
+  previewVideo.addEventListener('pause', () => {
+    if (previewVideo.ended) return;
+    $('previewPlay').querySelector('.icon-play').hidden = false;
+    $('previewPlay').querySelector('.icon-pause').hidden = true;
+  });
+  previewVideo.addEventListener('ended', stopPreview);
+  previewVideo.addEventListener('error', () => {
+    if (!previewVideo.src) return;
+    toast('Aperçu indisponible pour cette vidéo', 'error');
+    stopPreview();
   });
 
   $('copyLinkBtn').addEventListener('click', async () => {
@@ -650,7 +777,13 @@ function wire() {
     navigator.serviceWorker.register('/sw.js').catch(() => {});
   }
 
-  requestAnimationFrame(() => $('boot').classList.add('is-done'));
+  const boot = $('boot');
+  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  window.setTimeout(() => {
+    boot.classList.add('is-done');
+    document.documentElement.classList.remove('booting');
+    boot.setAttribute('aria-hidden', 'true');
+  }, reduce ? 180 : 2100);
 }
 
 wire();

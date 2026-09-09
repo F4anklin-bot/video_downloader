@@ -47,40 +47,34 @@ function png(size, paint) {
   return Buffer.concat([sig, chunk('IHDR', ihdr), chunk('IDAT', idat), chunk('IEND', Buffer.alloc(0))]);
 }
 
+function inRoundRect(px, py, x, y, w, h, r) {
+  const hw = w / 2;
+  const hh = h / 2;
+  const dx = Math.abs(px - (x + hw)) - hw + r;
+  const dy = Math.abs(py - (y + hh)) - hh + r;
+  const ox = Math.max(dx, 0);
+  const oy = Math.max(dy, 0);
+  return Math.hypot(ox, oy) + Math.min(Math.max(dx, dy), 0) - r <= 0;
+}
+
 function icon(x, y, s) {
-  const cx = s / 2;
-  const cy = s / 2;
-  const dx = x - cx;
-  const dy = y - cy;
-  const dist = Math.sqrt(dx * dx + dy * dy);
+  const lime = [212, 240, 79, 255];
   const bg = [8, 8, 10, 255];
-  const lime = [209, 249, 82, 255];
-  const ink = [245, 245, 244, 255];
+  const radius = s * 0.21;
+  const inBg = inRoundRect(x, y, 0, 0, s, s, radius);
 
-  const ringOuter = s * 0.32;
-  const ringInner = s * 0.24;
-  const core = s * 0.08;
+  const stem = inRoundRect(x, y, s * 0.23, s * 0.18, s * 0.175, s * 0.64, s * 0.06);
+  const top = inRoundRect(x, y, s * 0.23, s * 0.18, s * 0.57, s * 0.175, s * 0.06);
+  const mid = inRoundRect(x, y, s * 0.23, s * 0.455, s * 0.42, s * 0.16, s * 0.06);
 
-  if (dist < core) return lime;
-  if (dist < ringInner) return bg;
-  if (dist < ringOuter) {
-    const t = (ringOuter - dist) / (ringOuter - ringInner);
-    if (t > 0.12 && t < 0.88) return lime;
-    return bg;
+  if (stem || top || mid) {
+    if (!inBg) {
+      const fade = Math.min(1, Math.max(0, 1 - (Math.hypot(x - s / 2, y - s / 2) - s * 0.48) / (s * 0.03)));
+      return [lime[0], lime[1], lime[2], Math.round(255 * fade)];
+    }
+    return lime;
   }
-
-  const px = dx / s;
-  const py = dy / s;
-  if (px > -0.02 && px < 0.14 && Math.abs(py) < 0.11) {
-    const inTri = py > (px - 0.12) * 1.6 && py < -(px - 0.12) * 1.6 && px > -0.02;
-    if (inTri && dist > ringInner && dist < ringOuter * 0.98) return ink;
-  }
-
-  const radius = s * 0.48;
-  if (dist > radius) {
-    const fade = Math.min(1, (dist - radius) / (s * 0.02));
-    return [8, 8, 10, Math.round(255 * (1 - fade))];
-  }
+  if (!inBg) return [8, 8, 10, 0];
   return bg;
 }
 
