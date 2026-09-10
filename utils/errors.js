@@ -30,12 +30,11 @@ function mapYtdlpError(err) {
     return new AppError('EXTRACTION_FAILED', 'L’analyse a pris trop de temps. Réessayez.', 422);
   }
   if (
-    msg.includes('private') ||
-    msg.includes('login') ||
-    msg.includes('sign in') ||
-    msg.includes('logged-in') ||
-    msg.includes('cookies') ||
-    msg.includes('not a bot')
+    msg.includes('this video is private') ||
+    msg.includes('video is private') ||
+    msg.includes('members-only') ||
+    msg.includes('members only') ||
+    msg.includes('join this channel')
   ) {
     return ERRORS.VIDEO_PRIVATE();
   }

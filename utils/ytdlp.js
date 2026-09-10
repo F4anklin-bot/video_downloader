@@ -42,13 +42,6 @@ function resolveCookies() {
   return null;
 }
 
-function jsRuntimeArgs() {
-  if (process.platform === 'win32') return ['--js-runtimes', 'node'];
-  const node = process.execPath;
-  if (node && fs.existsSync(node)) return ['--js-runtimes', `node:${node}`];
-  return ['--js-runtimes', 'node'];
-}
-
 function ffmpegAsset() {
   const plat = process.platform;
   const arch = process.arch;
@@ -138,7 +131,6 @@ function extraArgs(kind = 'dl', { youtubeClients = YT_CLIENTS_PRIMARY } = {}) {
     info ? '15' : '20',
     '--extractor-args',
     `youtube:player_client=${youtubeClients};skip=translated_subs`,
-    ...jsRuntimeArgs(),
   ];
   if (!info) {
     args.push('--concurrent-fragments', '8', '--no-part', '--no-mtime');

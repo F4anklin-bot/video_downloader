@@ -662,12 +662,6 @@ function wire() {
   $('installBtn').addEventListener('click', promptInstall);
   $('installBtn2').addEventListener('click', promptInstall);
 
-  window.addEventListener('beforeinstallprompt', (e) => {
-    e.preventDefault();
-    state.deferredPrompt = e;
-    maybeInstallVisible();
-  });
-
   const dz = $('dropzone');
   const hint = $('dropHint');
   const onDrag = (e) => {
