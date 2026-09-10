@@ -58,6 +58,8 @@ function buildResult(info, format, platform, quality) {
   const ext = extFrom(info, format || {});
   const filename = `${platform}_${slug(author)}_${dateStamp(info.timestamp)}.${ext}`;
   const videoUrl = format?.url || info.url || null;
+  const proto = String(format?.protocol || info.protocol || '');
+  const acodec = format?.acodec;
   return {
     platform,
     videoUrl,
@@ -72,8 +74,8 @@ function buildResult(info, format, platform, quality) {
     height: format?.height || info.height || 0,
     ext,
     httpHeaders: format?.http_headers || info.http_headers || {},
-    protocol: format?.protocol || info.protocol || '',
-    needsMerge: !format || !format.acodec || format.acodec === 'none' || String(format.protocol || '').includes('m3u8'),
+    protocol: proto,
+    needsMerge: acodec === 'none' || /m3u8|dash/i.test(proto),
   };
 }
 

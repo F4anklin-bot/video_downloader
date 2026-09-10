@@ -1,11 +1,11 @@
 const axios = require('axios');
 const { execJson } = require('../utils/ytdlp');
-const { pickFormat, buildResult, withRetry } = require('../utils/downloader');
+const { pickFormat, buildResult } = require('../utils/downloader');
 const { mapYtdlpError } = require('../utils/errors');
 
 module.exports = async function extract(url, { quality = 'best', platform = 'generic' } = {}) {
   try {
-    const info = await withRetry(() => execJson(url), 1);
+    const info = await execJson(url, { quality });
     if (info._type === 'playlist' && Array.isArray(info.entries) && info.entries[0]) {
       return extractFromInfo(info.entries[0], quality, platform);
     }

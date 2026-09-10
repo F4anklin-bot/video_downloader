@@ -460,82 +460,32 @@ function downloadCurrent() {
   const url = `/api/file?url=${encodeURIComponent(state.sourceUrl)}&quality=${encodeURIComponent(state.quality)}`;
   state.downloading = true;
   markDownloading();
-  applyProgress(0, 0, 0);
+  $('transfer').hidden = false;
+  $('transfer').classList.add('is-indet');
   $('dlPercent').textContent = '…';
 
-  const xhr = new XMLHttpRequest();
-  xhr.open('GET', url);
-  xhr.responseType = 'blob';
-  xhr.timeout = 0;
-  let lastLoaded = 0;
-  let lastAt = Date.now();
-  let speed = 0;
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = info.filename || 'video.mp4';
+  a.rel = 'noopener';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
 
-  xhr.onprogress = (e) => {
-    const now = Date.now();
-    const dt = (now - lastAt) / 1000;
-    if (dt >= 0.2) {
-      speed = (e.loaded - lastLoaded) / dt;
-      lastLoaded = e.loaded;
-      lastAt = now;
-    }
-    const total = e.lengthComputable ? e.total : info.filesize || 0;
-    applyProgress(e.loaded, total, speed);
-  };
-
-  xhr.onload = async () => {
+  historyPush({
+    title: info.title,
+    author: info.author,
+    thumbnail: info.thumbnail,
+    platform: info.platform,
+    sourceUrl: state.sourceUrl,
+    filename: info.filename || 'video.mp4',
+    at: Date.now(),
+  });
+  toast('Téléchargement lancé');
+  window.setTimeout(() => {
     state.downloading = false;
-    const blob = xhr.response;
-    if (xhr.status < 200 || xhr.status >= 300) {
-      let message = 'Téléchargement impossible';
-      try {
-        const text = await blob.text();
-        message = JSON.parse(text).message || message;
-      } catch {
-        /* keep */
-      }
-      resetDownloadUi();
-      toast(message, 'error');
-      return;
-    }
-    if (blob.type && blob.type.includes('json')) {
-      try {
-        const message = JSON.parse(await blob.text()).message;
-        resetDownloadUi();
-        toast(message || 'Téléchargement impossible', 'error');
-        return;
-      } catch {
-        /* fallthrough */
-      }
-    }
-    const name = decodeURIComponent(xhr.getResponseHeader('X-Filename') || info.filename || 'video.mp4');
-    const objectUrl = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = objectUrl;
-    a.download = name;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(() => URL.revokeObjectURL(objectUrl), 4000);
     markDone();
-    historyPush({
-      title: info.title,
-      author: info.author,
-      thumbnail: info.thumbnail,
-      platform: info.platform,
-      sourceUrl: state.sourceUrl,
-      filename: name,
-      at: Date.now(),
-    });
-    toast('Fichier enregistré');
-  };
-
-  xhr.onerror = () => {
-    state.downloading = false;
-    resetDownloadUi();
-    toast('Connexion interrompue', 'error');
-  };
-  xhr.send();
+  }, 900);
 }
 
 function renderHistory() {

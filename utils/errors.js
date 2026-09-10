@@ -24,8 +24,19 @@ const ERRORS = {
 };
 
 function mapYtdlpError(err) {
-  const msg = String(err?.message || err || '').toLowerCase();
-  if (msg.includes('private') || msg.includes('login') || msg.includes('sign in') || msg.includes('logged-in') || msg.includes('cookies')) {
+  const raw = String(err?.message || err || '');
+  const msg = raw.toLowerCase();
+  if (msg.includes('timeout')) {
+    return new AppError('EXTRACTION_FAILED', 'L’analyse a pris trop de temps. Réessayez.', 422);
+  }
+  if (
+    msg.includes('private') ||
+    msg.includes('login') ||
+    msg.includes('sign in') ||
+    msg.includes('logged-in') ||
+    msg.includes('cookies') ||
+    msg.includes('not a bot')
+  ) {
     return ERRORS.VIDEO_PRIVATE();
   }
   if (msg.includes('404') || msg.includes('unavailable') || msg.includes('removed') || msg.includes('not found')) {

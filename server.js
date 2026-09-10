@@ -16,7 +16,7 @@ const platforms = require('./config/platforms');
 const { detectPlatform, normalizeUrl, isValidHttpUrl } = require('./utils/detector');
 const { AppError, ERRORS, mapYtdlpError } = require('./utils/errors');
 const { mediaHeaders } = require('./utils/headers');
-const { getYtdlp, extraArgs, formatArgs, ensureBinary, ensureFfmpeg, binPath } = require('./utils/ytdlp');
+const { getYtdlp, extraArgs, formatArgs, ensureBinary, ensureFfmpeg, getDirectUrl, ytdlpBin } = require('./utils/ytdlp');
 
 const extractors = {
   tiktok: require('./extractors/tiktok'),
@@ -35,7 +35,7 @@ const extractors = {
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
 const MAX_FILE_BYTES = Number(process.env.MAX_FILE_BYTES) || 524288000;
-const cache = new NodeCache({ stdTTL: 300, checkperiod: 60 });
+const cache = new NodeCache({ stdTTL: 900, checkperiod: 120 });
 const serverless = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
 const tmpDir = serverless
   ? path.join(os.tmpdir(), 'franklins-tmp')
@@ -124,8 +124,8 @@ app.use('/api/', limiter);
   }),
 );
 
-function cacheKey(url, quality) {
-  return `${url}::${quality || 'best'}`;
+function cacheKey(url) {
+  return url;
 }
 
 async function extractMedia(rawUrl, quality = 'best') {
@@ -133,7 +133,7 @@ async function extractMedia(rawUrl, quality = 'best') {
   if (!detected.url || !isValidHttpUrl(detected.url)) {
     throw ERRORS.INVALID_URL();
   }
-  const key = cacheKey(detected.url, quality);
+  const key = cacheKey(detected.url);
   const cached = cache.get(key);
   if (cached) return cached;
 
@@ -199,13 +199,23 @@ function canProxy(data) {
   if (data.needsMerge) return false;
   const url = String(data.videoUrl);
   const proto = String(data.protocol || '');
-  if (proto.includes('m3u8') || proto.includes('dash') || url.includes('.m3u8')) return false;
-  if (/googlevideo\.com|manifest/i.test(url)) return false;
+  if (proto.includes('m3u8') || proto.includes('dash') || url.includes('.m3u8') || /\/manifest/i.test(url)) {
+    return false;
+  }
   return /^https?:\/\//i.test(url);
 }
 
 async function pipeAxios(data, req, res) {
-  const headers = { ...mediaHeaders(data.videoUrl), ...(data.httpHeaders || {}) };
+  const yt = /googlevideo\.com|youtube\.com|youtu\.be/i.test(String(data.videoUrl));
+  const headers = {
+    Accept: '*/*',
+    'Accept-Encoding': 'identity',
+    Connection: 'keep-alive',
+    ...(yt ? { Referer: 'https://www.youtube.com/', Origin: 'https://www.youtube.com' } : {}),
+    ...mediaHeaders(data.videoUrl),
+    ...(data.httpHeaders || {}),
+    'Accept-Encoding': 'identity',
+  };
   const upstream = await axios({
     method: 'get',
     url: data.videoUrl,
@@ -214,6 +224,7 @@ async function pipeAxios(data, req, res) {
     timeout: 120000,
     maxRedirects: 5,
     maxContentLength: MAX_FILE_BYTES,
+    decompress: false,
     validateStatus: (s) => s >= 200 && s < 400,
   });
 
@@ -248,8 +259,8 @@ function sendFileHeaders(res, data, size) {
 
 function pipeYtdlpStream(sourceUrl, quality, data, res) {
   return new Promise((resolve, reject) => {
-    const args = [sourceUrl, ...formatArgs(quality), '-o', '-', '--no-part', ...extraArgs()];
-    const child = spawn(binPath, args, { windowsHide: true });
+    const args = [sourceUrl, ...formatArgs(quality), '-o', '-', ...extraArgs('dl')];
+    const child = spawn(ytdlpBin(), args, { windowsHide: true });
     let started = false;
     let settled = false;
     const fail = (err) => {
@@ -326,12 +337,16 @@ async function pipeYtdlpFile(sourceUrl, quality, data, res) {
   fs.unlink(filePath, () => {});
 }
 
-async function pipeYtdlp(sourceUrl, quality, data, res) {
+async function pipeYtdlp(sourceUrl, quality, data, req, res) {
   try {
     await pipeYtdlpStream(sourceUrl, quality, data, res);
   } catch (err) {
     if (res.headersSent) throw err;
-    await pipeYtdlpFile(sourceUrl, quality, data, res);
+    const direct = await getDirectUrl(sourceUrl, quality);
+    if (!direct) throw err;
+    data.videoUrl = direct;
+    data.needsMerge = false;
+    await pipeAxios(data, req, res);
   }
 }
 
@@ -385,10 +400,10 @@ app.get('/api/file', async (req, res, next) => {
         await pipeAxios(data, req, res);
         return;
       } catch {
-        cache.del(cacheKey(data.sourceUrl, quality));
+        /* stream via yt-dlp instead */
       }
     }
-    await pipeYtdlp(data.sourceUrl, quality, data, res);
+    await pipeYtdlp(data.sourceUrl, quality, data, req, res);
   } catch (err) {
     if (!res.headersSent) next(err);
     else res.end();

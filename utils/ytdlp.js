@@ -2,6 +2,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const zlib = require('zlib');
+const { spawn } = require('child_process');
 const YTDlpWrap = require('yt-dlp-wrap').default;
 
 const serverless = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
@@ -51,7 +52,18 @@ async function ensureFfmpeg() {
   return ffmpegPath;
 }
 
+function systemYtdlp() {
+  if (process.platform === 'win32') return null;
+  return ['/usr/local/bin/yt-dlp', '/usr/bin/yt-dlp'].find((p) => fs.existsSync(p)) || null;
+}
+
+function ytdlpBin() {
+  return systemYtdlp() || binPath;
+}
+
 async function ensureBinary() {
+  const system = systemYtdlp();
+  if (system) return system;
   if (!fs.existsSync(binDir)) fs.mkdirSync(binDir, { recursive: true });
   const stat = fs.existsSync(binPath) ? fs.statSync(binPath) : null;
   if (stat && stat.size > 1000000) return binPath;
@@ -71,34 +83,35 @@ async function getYtdlp() {
   if (!ready) {
     ready = (async () => {
       await Promise.all([ensureBinary(), ensureFfmpeg().catch(() => null)]);
-      instance = new YTDlpWrap(binPath);
+      instance = new YTDlpWrap(ytdlpBin());
       return instance;
     })();
   }
   return ready;
 }
 
-function extraArgs() {
+function extraArgs(kind = 'dl') {
+  const info = kind === 'info';
   const args = [
     '--no-playlist',
     '--no-warnings',
     '--no-check-certificates',
-    '--geo-bypass',
-    '--concurrent-fragments',
-    '16',
+    '--no-check-formats',
+    '--force-ipv4',
     '--retries',
-    '2',
+    info ? '0' : '1',
     '--fragment-retries',
-    '2',
+    info ? '0' : '1',
     '--socket-timeout',
-    '20',
+    info ? '10' : '15',
     '--extractor-args',
-    'youtube:player_client=android,tv,web',
+    'youtube:player_client=android;skip=hls,dash,translated_subs',
   ];
-  const ffmpeg = systemFfmpeg() || (fs.existsSync(ffmpegPath) ? ffmpegPath : null);
-  if (ffmpeg) {
-    args.push('--ffmpeg-location', ffmpeg);
+  if (!info) {
+    args.push('--concurrent-fragments', '8', '--no-part', '--no-mtime');
   }
+  const ffmpeg = systemFfmpeg() || (fs.existsSync(ffmpegPath) ? ffmpegPath : null);
+  if (ffmpeg) args.push('--ffmpeg-location', ffmpeg);
   if (process.env.YTDLP_COOKIES && fs.existsSync(process.env.YTDLP_COOKIES)) {
     args.push('--cookies', process.env.YTDLP_COOKIES);
   }
@@ -108,36 +121,120 @@ function extraArgs() {
   return args;
 }
 
-async function execJson(url) {
-  const ytdlp = await getYtdlp();
-  const raw = await ytdlp.execPromise(
+function parseJsonBlob(text) {
+  const raw = String(text || '');
+  const start = raw.indexOf('{');
+  if (start < 0) return null;
+  try {
+    return JSON.parse(raw.slice(start));
+  } catch {
+    const end = raw.lastIndexOf('}');
+    if (end > start) {
+      try {
+        return JSON.parse(raw.slice(start, end + 1));
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  }
+}
+
+function runYtdlp(args, { timeoutMs = 45000 } = {}) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(ytdlpBin(), args, { windowsHide: true });
+    const chunks = [];
+    let err = '';
+    const timer = setTimeout(() => {
+      child.kill();
+      reject(new Error('yt-dlp timeout'));
+    }, timeoutMs);
+    child.stdout.on('data', (c) => chunks.push(c));
+    child.stderr.on('data', (c) => {
+      err += c;
+      if (err.length > 200000) err = err.slice(-80000);
+    });
+    child.on('error', (e) => {
+      clearTimeout(timer);
+      reject(e);
+    });
+    child.on('close', (code) => {
+      clearTimeout(timer);
+      const out = Buffer.concat(chunks).toString('utf8');
+      resolve({ code, out, err });
+    });
+  });
+}
+
+const INFO_PRINT =
+  '%(.{id,title,thumbnail,duration,uploader,channel,ext,url,width,height,filesize,filesize_approx,timestamp,http_headers,protocol,acodec,vcodec,format_id,webpage_url,_type,entries})#j';
+
+async function execJson(url, { quality = 'best' } = {}) {
+  await getYtdlp();
+  const fmt = formatArgs(quality);
+  const attempts = [
+    [url, '--skip-download', ...fmt, '-O', INFO_PRINT, '--no-progress', ...extraArgs('info')],
     [
       url,
-      '--dump-single-json',
       '--skip-download',
-      '--no-check-formats',
-      ...extraArgs(),
+      '-f',
+      'b',
+      '-O',
+      INFO_PRINT,
+      '--no-playlist',
+      '--no-warnings',
+      '--extractor-args',
+      'youtube:player_client=web;skip=translated_subs',
     ],
-    { maxBuffer: 64 * 1024 * 1024 },
+  ];
+  let lastErr = 'yt-dlp failed';
+  for (const args of attempts) {
+    const { out, err, code } = await runYtdlp(args, { timeoutMs: attempts[0] === args ? 16000 : 20000 });
+    const json = parseJsonBlob(out) || parseJsonBlob(err);
+    if (json && (json.id || json.title || json.url || json.formats || json.entries)) {
+      if (!json.formats && json.url) {
+        json.formats = [
+          {
+            url: json.url,
+            ext: json.ext,
+            width: json.width,
+            height: json.height,
+            filesize: json.filesize || json.filesize_approx,
+            http_headers: json.http_headers,
+            protocol: json.protocol,
+            acodec: json.acodec,
+            vcodec: json.vcodec,
+            format_id: json.format_id,
+          },
+        ];
+      }
+      return json;
+    }
+    lastErr = (err || out || `yt-dlp exit ${code}`).trim().split('\n').filter(Boolean).slice(-3).join(' ') || lastErr;
+  }
+  throw new Error(lastErr);
+}
+
+async function getDirectUrl(url, quality = 'best') {
+  await getYtdlp();
+  const { out, err } = await runYtdlp(
+    [url, '-g', ...formatArgs(quality), ...extraArgs('info')],
+    { timeoutMs: 16000 },
   );
-  const text = String(raw).trim();
-  const start = text.indexOf('{');
-  const json = start >= 0 ? text.slice(start) : text;
-  return JSON.parse(json);
+  const line = `${out}\n${err}`
+    .split('\n')
+    .map((l) => l.trim())
+    .filter((l) => /^https?:\/\//i.test(l))
+    .pop();
+  return line || null;
 }
 
 function formatArgs(quality = 'best') {
   const q = String(quality || 'best').toLowerCase();
-  if (q === 'fast') {
-    return ['-f', '18/22/b[ext=mp4]/b'];
+  if (q === 'fast' || q === 'sd' || q === 'worst') {
+    return ['-f', '18/b[height<=480][ext=mp4]/b[ext=mp4]/b'];
   }
-  if (q === 'sd' || q === 'worst') {
-    return ['-f', '18/b[height<=480]/worst'];
-  }
-  if (q === 'hd') {
-    return ['-f', '22/b[height<=1080][ext=mp4]/bv*[height<=1080]+ba/18/b', '--merge-output-format', 'mp4'];
-  }
-  return ['-f', '22/18/b[ext=mp4]/b/bv*[height<=1080]+ba/best', '--merge-output-format', 'mp4'];
+  return ['-f', '22/18/b[ext=mp4]/b'];
 }
 
 module.exports = {
@@ -147,6 +244,8 @@ module.exports = {
   execJson,
   extraArgs,
   formatArgs,
+  getDirectUrl,
+  ytdlpBin,
   binPath,
   ffmpegPath,
 };

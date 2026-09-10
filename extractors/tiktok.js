@@ -7,7 +7,7 @@ const { buildResult } = require('../utils/downloader');
 async function scrapeTiktok(url) {
   const res = await axios.get(url, {
     headers: browserHeaders(url),
-    timeout: 15000,
+    timeout: 8000,
     maxRedirects: 5,
   });
   const html = res.data;
