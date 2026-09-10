@@ -17,6 +17,7 @@ const { detectPlatform, normalizeUrl, isValidHttpUrl } = require('./utils/detect
 const { AppError, ERRORS, mapYtdlpError } = require('./utils/errors');
 const { mediaHeaders } = require('./utils/headers');
 const { getYtdlp, extraArgs, formatArgs, ensureBinary, ensureFfmpeg, getDirectUrl, ytdlpBin } = require('./utils/ytdlp');
+const { warmSocksFarm } = require('./utils/socksFarm');
 
 const extractors = {
   tiktok: require('./extractors/tiktok'),
@@ -161,7 +162,7 @@ async function extractMedia(rawUrl, quality = 'best') {
     httpHeaders: result.httpHeaders || {},
     sourceUrl: detected.url,
   };
-  if (payload.videoUrl) cache.set(key, payload);
+  if (payload.videoUrl || payload.needsMerge) cache.set(key, payload);
   return payload;
 }
 
@@ -318,21 +319,24 @@ function pipeYtdlpStream(sourceUrl, quality, data, res) {
 }
 
 async function pipeYtdlpFile(sourceUrl, quality, data, res) {
-  const ytdlp = await getYtdlp();
+  await getYtdlp();
   const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const outTpl = path.join(tmpDir, `${id}.%(ext)s`);
-  const opts = { maxBuffer: 64 * 1024 * 1024 };
+  const { runYtdlp } = require('./utils/ytdlp');
   const attempts = [
     [sourceUrl, ...formatArgs(quality), '-o', outTpl, '--no-part', ...extraArgs()],
-    [sourceUrl, '-f', '18/22/b', '-o', outTpl, '--no-part', ...extraArgs()],
+    [sourceUrl, '-f', 'bv*+ba/b', '--merge-output-format', 'mp4', '-o', outTpl, '--no-part', ...extraArgs()],
   ];
 
   let lastErr;
   for (const args of attempts) {
     try {
-      await ytdlp.execPromise(args, opts);
-      lastErr = null;
-      break;
+      const { code, err } = await runYtdlp(args, { timeoutMs: 180000 });
+      if (code === 0) {
+        lastErr = null;
+        break;
+      }
+      lastErr = new Error(err || `yt-dlp ${code}`);
     } catch (err) {
       lastErr = err;
     }
@@ -386,6 +390,7 @@ app.get('/api/health', (_req, res) => {
     name: "franklin's",
     cookies: Boolean(resolveCookies()),
     proxy: Boolean(resolveProxy()),
+    homeBridge: Boolean(String(process.env.HOME_BRIDGE_URL || '').trim()),
   });
 });
 
@@ -483,6 +488,7 @@ module.exports = app;
 if (require.main === module) {
   app.listen(PORT, () => {
     console.log(`Franklin's prêt sur http://localhost:${PORT}`);
+    warmSocksFarm();
     ensureBinary().catch((err) => {
       console.warn('yt-dlp sera téléchargé au premier usage:', err.message);
     });

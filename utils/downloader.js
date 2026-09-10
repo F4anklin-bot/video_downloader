@@ -60,6 +60,10 @@ function buildResult(info, format, platform, quality) {
   const videoUrl = format?.url || info.url || null;
   const proto = String(format?.protocol || info.protocol || '');
   const acodec = format?.acodec;
+  const hasDashOnly =
+    !videoUrl &&
+    Array.isArray(info.formats) &&
+    info.formats.some((f) => f.url && f.vcodec && f.vcodec !== 'none');
   return {
     platform,
     videoUrl,
@@ -75,7 +79,7 @@ function buildResult(info, format, platform, quality) {
     ext,
     httpHeaders: format?.http_headers || info.http_headers || {},
     protocol: proto,
-    needsMerge: acodec === 'none' || /m3u8|dash/i.test(proto),
+    needsMerge: !videoUrl || hasDashOnly || acodec === 'none' || /m3u8|dash/i.test(proto),
   };
 }
 

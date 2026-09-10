@@ -3,10 +3,31 @@ const axios = require('axios');
 const generic = require('./generic');
 const { extractFromInfo } = generic;
 const { resolveProxy } = require('../utils/ytdlp');
+const { findFreeSocks } = require('../utils/socksFarm');
 
 const VR_VERSION = '1.65.10';
 const VR_UA = `com.google.android.apps.youtube.vr.oculus/${VR_VERSION} (Linux; U; Android 12L; eureka-user Build/SQ3A.220605.009.A1) gzip`;
 const ipv4Agent = process.platform === 'win32' ? undefined : new https.Agent({ family: 4, keepAlive: false });
+
+const INVIDIOUS = [
+  'https://invidious.jing.rocks',
+  'https://invidious.private.coffee',
+  'https://yt.artemislena.eu',
+  'https://invidious.flokinet.to',
+  'https://iv.ggtyler.dev',
+  'https://invidious.protokolla.fi',
+  'https://invidious.perennialte.ch',
+  'https://yewtu.be',
+  'https://invidious.nerdvpn.de',
+];
+
+const PIPED = [
+  'https://pipedapi.adminforge.de',
+  'https://pipedapi.reallyaweso.me',
+  'https://api.piped.private.coffee',
+  'https://pipedapi.leptons.xyz',
+  'https://pipedapi.kavin.rocks',
+];
 
 function proxyAgent() {
   const proxy = resolveProxy();
@@ -29,14 +50,6 @@ function axOpts(extra = {}) {
     ...extra,
   };
 }
-
-const PIPED = [
-  'https://pipedapi.adminforge.de',
-  'https://pipedapi.reallyaweso.me',
-  'https://api.piped.private.coffee',
-  'https://pipedapi.leptons.xyz',
-  'https://pipedapi.kavin.rocks',
-];
 
 function videoIdFromUrl(url) {
   const u = String(url || '');
@@ -120,62 +133,40 @@ function infoFromPlayer(id, data) {
 }
 
 async function innertubePlayer(id) {
-  const clients = [
-    {
-      clientName: 'ANDROID_VR',
-      clientVersion: VR_VERSION,
-      deviceMake: 'Oculus',
-      deviceModel: 'Quest 3',
-      androidSdkVersion: 32,
-      osName: 'Android',
-      osVersion: '12L',
-      ua: VR_UA,
-      name: '28',
+  const body = {
+    context: {
+      client: {
+        clientName: 'ANDROID_VR',
+        clientVersion: VR_VERSION,
+        deviceMake: 'Oculus',
+        deviceModel: 'Quest 3',
+        androidSdkVersion: 32,
+        osName: 'Android',
+        osVersion: '12L',
+        hl: 'en',
+        gl: 'US',
+        utcOffsetMinutes: 0,
+      },
     },
-    {
-      clientName: 'TVHTML5_SIMPLY_EMBEDDED_PLAYER',
-      clientVersion: '2.0',
-      clientScreen: 'EMBED',
-      ua: 'Mozilla/5.0 (ChromiumStylePlatform) Cobalt/Version',
-      name: '85',
-    },
-  ];
-  let lastErr;
-  for (const c of clients) {
-    try {
-      const { ua, name, ...client } = c;
-      const body = {
-        context: { client: { ...client, hl: 'en', gl: 'US', utcOffsetMinutes: 0 } },
-        videoId: id,
-        contentCheckOk: true,
-        racyCheckOk: true,
-        ...(c.clientName.includes('EMBED')
-          ? { thirdParty: { embedUrl: 'https://www.youtube.com' } }
-          : {}),
-      };
-      const res = await axios.post(
-        'https://youtubei.googleapis.com/youtubei/v1/player?prettyPrint=false',
-        body,
-        axOpts({
-          headers: {
-            'Content-Type': 'application/json',
-            'User-Agent': ua,
-            'X-YouTube-Client-Name': name,
-            'X-YouTube-Client-Version': client.clientVersion,
-          },
-          validateStatus: (s) => s >= 200 && s < 500,
-        }),
-      );
-      if (res.status >= 400) {
-        lastErr = new Error(`innertube ${res.status}`);
-        continue;
-      }
-      return infoFromPlayer(id, res.data);
-    } catch (err) {
-      lastErr = err;
-    }
-  }
-  throw lastErr || new Error('innertube failed');
+    videoId: id,
+    contentCheckOk: true,
+    racyCheckOk: true,
+  };
+  const res = await axios.post(
+    'https://youtubei.googleapis.com/youtubei/v1/player?prettyPrint=false',
+    body,
+    axOpts({
+      headers: {
+        'Content-Type': 'application/json',
+        'User-Agent': VR_UA,
+        'X-YouTube-Client-Name': '28',
+        'X-YouTube-Client-Version': VR_VERSION,
+      },
+      validateStatus: (s) => s >= 200 && s < 500,
+    }),
+  );
+  if (res.status >= 400) throw new Error(`innertube ${res.status}`);
+  return infoFromPlayer(id, res.data);
 }
 
 async function pipedInfo(id) {
@@ -189,10 +180,9 @@ async function pipedInfo(id) {
     );
     if (res.status >= 400 || !res.data?.title) throw new Error(`${base} ${res.status}`);
     const data = res.data;
-    const streams = [...(data.videoStreams || [])];
     const formats = preferMuxed(
       mapFormats(
-        streams.map((s) => ({
+        (data.videoStreams || []).map((s) => ({
           url: s.url,
           mimeType: s.mimeType || s.format,
           qualityLabel: s.quality,
@@ -218,20 +208,139 @@ async function pipedInfo(id) {
   return Promise.any(PIPED.map(tryBase));
 }
 
+async function invidiousLocal(id) {
+  const tryHost = async (host) => {
+    const streamUrl = `${host}/latest_version?id=${encodeURIComponent(id)}&itag=18&local=true`;
+    const head = await axios.get(streamUrl, {
+      timeout: 7000,
+      maxRedirects: 3,
+      responseType: 'stream',
+      validateStatus: () => true,
+      headers: { 'User-Agent': 'franklins/1.0', Accept: '*/*' },
+    });
+    const ctype = String(head.headers['content-type'] || '');
+    const len = Number(head.headers['content-length'] || 0);
+    if (head.data && typeof head.data.destroy === 'function') head.data.destroy();
+    if (head.status >= 400 || /text\/html|json/i.test(ctype)) throw new Error('bad');
+    if (!/video|octet|mp4|mpeg/i.test(ctype) && len < 10000) throw new Error('empty');
+
+    let title = 'YouTube';
+    let author = 'youtube';
+    try {
+      const meta = await axios.get(`${host}/api/v1/videos/${id}`, {
+        timeout: 5000,
+        validateStatus: () => true,
+        headers: { Accept: 'application/json' },
+      });
+      if (meta.data?.title) {
+        title = meta.data.title;
+        author = meta.data.author || author;
+      }
+    } catch {
+      /* keep defaults */
+    }
+
+    return {
+      id,
+      title,
+      uploader: author,
+      thumbnail: `https://i.ytimg.com/vi/${id}/hqdefault.jpg`,
+      duration: 0,
+      ext: 'mp4',
+      webpage_url: `https://www.youtube.com/watch?v=${id}`,
+      formats: [
+        {
+          url: streamUrl,
+          ext: 'mp4',
+          height: 360,
+          acodec: 'aac',
+          vcodec: 'avc1',
+          protocol: 'https',
+          filesize: len || 0,
+          http_headers: { 'User-Agent': 'franklins/1.0' },
+        },
+      ],
+    };
+  };
+  return Promise.any(INVIDIOUS.map(tryHost));
+}
+
+async function withTempProxy(proxy, fn) {
+  const prev = process.env.YTDLP_PROXY;
+  process.env.YTDLP_PROXY = proxy;
+  try {
+    return await fn();
+  } finally {
+    if (prev) process.env.YTDLP_PROXY = prev;
+    else delete process.env.YTDLP_PROXY;
+  }
+}
+
+async function homeBridge(url, quality) {
+  const base = String(process.env.HOME_BRIDGE_URL || '')
+    .trim()
+    .replace(/\/$/, '');
+  if (!base) throw new Error('no home bridge');
+  const secret = String(process.env.HOME_BRIDGE_SECRET || '').trim();
+  const res = await axios.post(
+    `${base}/extract`,
+    { url, quality },
+    {
+      timeout: 90000,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(secret ? { Authorization: `Bearer ${secret}` } : {}),
+      },
+      validateStatus: () => true,
+    },
+  );
+  if (res.status >= 400 || !res.data?.videoUrl) {
+    throw new Error(res.data?.message || `home bridge ${res.status}`);
+  }
+  return {
+    ...res.data,
+    httpHeaders: {
+      ...(res.data.httpHeaders || {}),
+      ...(secret ? { Authorization: `Bearer ${secret}` } : {}),
+    },
+  };
+}
+
 module.exports = async function extract(url, opts = {}) {
   const quality = opts.quality || 'best';
   const id = videoIdFromUrl(url);
-  const hasProxy = Boolean(resolveProxy());
 
-  // With WARP/proxy, yt-dlp is the most reliable path on cloud IPs.
-  if (hasProxy) {
+  // 0) Free home PC bridge (Cloudflare Tunnel) — most reliable free option on cloud
+  if (!opts._noBridge && process.env.HOME_BRIDGE_URL) {
     try {
-      return await generic(url, { ...opts, platform: 'youtube' });
+      const bridged = await homeBridge(url, quality);
+      if (bridged?.videoUrl) return bridged;
     } catch {
-      /* fall through to other methods */
+      /* fall through to cloud methods */
     }
   }
 
+  // Cookies + yt-dlp first when available (free, works on residential / lucky IPs)
+  if (require('../utils/ytdlp').resolveCookies()) {
+    try {
+      return await generic(url, { ...opts, platform: 'youtube' });
+    } catch {
+      /* continue */
+    }
+  }
+
+  // 1) Invidious local=true — free, fast (instance fetches googlevideo for us)
+  if (id) {
+    try {
+      const info = await invidiousLocal(id);
+      const result = extractFromInfo(info, quality, 'youtube');
+      if (result.videoUrl) return result;
+    } catch {
+      /* next */
+    }
+  }
+
+  // 2) Direct innertube / piped (works on residential / lucky cloud IPs)
   if (id) {
     for (const step of [innertubePlayer, pipedInfo]) {
       try {
@@ -241,6 +350,31 @@ module.exports = async function extract(url, opts = {}) {
       } catch {
         /* next */
       }
+    }
+  }
+
+  // 3) Existing WARP / env proxy → yt-dlp
+  if (resolveProxy()) {
+    try {
+      return await generic(url, { ...opts, platform: 'youtube' });
+    } catch {
+      /* next */
+    }
+  }
+
+  // 4) Free SOCKS5 farm → yt-dlp (slow first hit, then cached) — skip on home bridge
+  if (!opts._noBridge) {
+    try {
+      const free = await findFreeSocks();
+      if (free) {
+        const result = await withTempProxy(free, () => generic(url, { ...opts, platform: 'youtube' }));
+        if (result?.videoUrl) {
+          process.env.YTDLP_PROXY = free;
+          return result;
+        }
+      }
+    } catch {
+      /* next */
     }
   }
 

@@ -6,6 +6,7 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js",
+    "bridge": "node scripts/home-bridge.js",
     "icons": "node scripts/generate-icons.js",
     "vercel-build": "echo ok"
   },

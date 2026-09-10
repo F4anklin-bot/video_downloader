@@ -19,9 +19,9 @@ let ready = null;
 let cookiesFile = null;
 let cookiesResolved = false;
 
-const YT_CLIENTS_PRIMARY = 'tv,web_safari,web_embedded,android_vr';
-const YT_CLIENTS_FALLBACK = 'web_embedded,tv,web_safari';
-const YT_CLIENTS_WITH_COOKIES = 'web,mweb,tv,web_safari';
+const YT_CLIENTS_PRIMARY = 'tv,web_safari,web_embedded,android_vr,visionos';
+const YT_CLIENTS_FALLBACK = 'web_embedded,tv,web_safari,visionos';
+const YT_CLIENTS_WITH_COOKIES = 'web,mweb,tv,web_safari,visionos';
 
 function resolveProxy() {
   let p = String(process.env.YTDLP_PROXY || '').trim();
@@ -230,39 +230,28 @@ function runYtdlp(args, { timeoutMs = 45000 } = {}) {
 }
 
 const INFO_PRINT =
-  '%(.{id,title,thumbnail,duration,uploader,channel,ext,url,width,height,filesize,filesize_approx,timestamp,http_headers,protocol,acodec,vcodec,format_id,webpage_url,_type,entries})#j';
+  '%(.{id,title,thumbnail,duration,uploader,channel,ext,url,width,height,filesize,filesize_approx,timestamp,http_headers,protocol,acodec,vcodec,format_id,webpage_url,_type,entries,formats.{format_id,url,ext,width,height,filesize,filesize_approx,tbr,acodec,vcodec,protocol,http_headers}})#j';
 
 async function execJson(url, { quality = 'best' } = {}) {
   await getYtdlp();
-  const fmt = formatArgs(quality);
   const attempts = [
-    [url, '--skip-download', ...fmt, '-O', INFO_PRINT, '--no-progress', ...extraArgs('info')],
+    // Full JSON first — format selectors often fail when only DASH is offered
+    [url, '--skip-download', '-J', '--no-progress', ...extraArgs('info')],
+    [url, '--skip-download', '-O', INFO_PRINT, '--no-progress', ...extraArgs('info')],
     [
       url,
       '--skip-download',
-      '-f',
-      'b',
-      '-O',
-      INFO_PRINT,
+      '-J',
       '--no-progress',
       ...extraArgs('info', {
-        youtubeClients: resolveCookies() ? 'web,mweb,tv' : YT_CLIENTS_FALLBACK,
+        youtubeClients: resolveCookies() ? 'tv,web,mweb' : YT_CLIENTS_FALLBACK,
       }),
     ],
-    [
-      url,
-      '--skip-download',
-      '-f',
-      'b',
-      '-O',
-      INFO_PRINT,
-      '--no-progress',
-      ...extraArgs('info', { youtubeClients: 'default' }),
-    ],
+    [url, '--skip-download', '-J', '--no-progress', ...extraArgs('info', { youtubeClients: 'default' })],
   ];
   let lastErr = 'yt-dlp failed';
   for (const [i, args] of attempts.entries()) {
-    const { out, err, code } = await runYtdlp(args, { timeoutMs: i === 0 ? 28000 : 35000 });
+    const { out, err, code } = await runYtdlp(args, { timeoutMs: i === 0 ? 45000 : 40000 });
     const json = parseJsonBlob(out) || parseJsonBlob(err);
     if (json && (json.id || json.title || json.url || json.formats || json.entries)) {
       if (!json.formats && json.url) {
@@ -305,9 +294,10 @@ async function getDirectUrl(url, quality = 'best') {
 function formatArgs(quality = 'best') {
   const q = String(quality || 'best').toLowerCase();
   if (q === 'fast' || q === 'sd' || q === 'worst') {
-    return ['-f', '18/b[height<=480][ext=mp4]/b[height<=480]/b[ext=mp4]/b'];
+    return ['-f', '18/bv*[height<=480]+ba/b[height<=480]/b'];
   }
-  return ['-f', '22/18/b[ext=mp4]/best[acodec!=none]/b'];
+  // Prefer mergeable DASH when progressive (22/18) is blocked
+  return ['-f', 'bv*+ba/b', '--merge-output-format', 'mp4'];
 }
 
 module.exports = {
@@ -320,6 +310,7 @@ module.exports = {
   getDirectUrl,
   resolveCookies,
   resolveProxy,
+  runYtdlp,
   ytdlpBin,
   binPath,
   ffmpegPath,
