@@ -9,3 +9,5 @@ services:
         value: production
       - key: MAX_FILE_BYTES
         value: "524288000"
+      - key: YTDLP_COOKIES_TXT
+        sync: false

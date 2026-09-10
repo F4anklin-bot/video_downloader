@@ -16,6 +16,38 @@ const ffmpegPath = path.join(binDir, ffmpegName);
 
 let instance = null;
 let ready = null;
+let cookiesFile = null;
+
+const YT_CLIENTS_PRIMARY = 'tv,web_safari,web_embedded,android_vr';
+const YT_CLIENTS_FALLBACK = 'web_embedded,tv,web_safari';
+
+function resolveCookies() {
+  if (cookiesFile) return cookiesFile;
+  const filePath = process.env.YTDLP_COOKIES;
+  if (filePath && fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
+    cookiesFile = filePath;
+    return cookiesFile;
+  }
+  let body = process.env.YTDLP_COOKIES_TXT || '';
+  if (process.env.YTDLP_COOKIES_B64) {
+    body = Buffer.from(process.env.YTDLP_COOKIES_B64, 'base64').toString('utf8');
+  }
+  body = String(body || '').replace(/\\n/g, '\n').trim();
+  if (body.length > 40) {
+    const dest = path.join(os.tmpdir(), 'franklins-cookies.txt');
+    fs.writeFileSync(dest, body);
+    cookiesFile = dest;
+    return cookiesFile;
+  }
+  return null;
+}
+
+function jsRuntimeArgs() {
+  if (process.platform === 'win32') return ['--js-runtimes', 'node'];
+  const node = process.execPath;
+  if (node && fs.existsSync(node)) return ['--js-runtimes', `node:${node}`];
+  return ['--js-runtimes', 'node'];
+}
 
 function ffmpegAsset() {
   const plat = process.platform;
@@ -90,7 +122,7 @@ async function getYtdlp() {
   return ready;
 }
 
-function extraArgs(kind = 'dl') {
+function extraArgs(kind = 'dl', { youtubeClients = YT_CLIENTS_PRIMARY } = {}) {
   const info = kind === 'info';
   const args = [
     '--no-playlist',
@@ -99,22 +131,22 @@ function extraArgs(kind = 'dl') {
     '--no-check-formats',
     '--force-ipv4',
     '--retries',
-    info ? '0' : '1',
+    info ? '1' : '2',
     '--fragment-retries',
-    info ? '0' : '1',
+    info ? '1' : '2',
     '--socket-timeout',
-    info ? '10' : '15',
+    info ? '15' : '20',
     '--extractor-args',
-    'youtube:player_client=android;skip=hls,dash,translated_subs',
+    `youtube:player_client=${youtubeClients};skip=translated_subs`,
+    ...jsRuntimeArgs(),
   ];
   if (!info) {
     args.push('--concurrent-fragments', '8', '--no-part', '--no-mtime');
   }
   const ffmpeg = systemFfmpeg() || (fs.existsSync(ffmpegPath) ? ffmpegPath : null);
   if (ffmpeg) args.push('--ffmpeg-location', ffmpeg);
-  if (process.env.YTDLP_COOKIES && fs.existsSync(process.env.YTDLP_COOKIES)) {
-    args.push('--cookies', process.env.YTDLP_COOKIES);
-  }
+  const cookies = resolveCookies();
+  if (cookies) args.push('--cookies', cookies);
   const cacheDir = path.join(binDir, 'cache');
   if (!fs.existsSync(cacheDir)) fs.mkdirSync(cacheDir, { recursive: true });
   args.push('--cache-dir', cacheDir);
@@ -181,15 +213,23 @@ async function execJson(url, { quality = 'best' } = {}) {
       'b',
       '-O',
       INFO_PRINT,
-      '--no-playlist',
-      '--no-warnings',
-      '--extractor-args',
-      'youtube:player_client=web;skip=translated_subs',
+      '--no-progress',
+      ...extraArgs('info', { youtubeClients: YT_CLIENTS_FALLBACK }),
+    ],
+    [
+      url,
+      '--skip-download',
+      '-f',
+      'b',
+      '-O',
+      INFO_PRINT,
+      '--no-progress',
+      ...extraArgs('info', { youtubeClients: 'default' }),
     ],
   ];
   let lastErr = 'yt-dlp failed';
-  for (const args of attempts) {
-    const { out, err, code } = await runYtdlp(args, { timeoutMs: attempts[0] === args ? 16000 : 20000 });
+  for (const [i, args] of attempts.entries()) {
+    const { out, err, code } = await runYtdlp(args, { timeoutMs: i === 0 ? 28000 : 35000 });
     const json = parseJsonBlob(out) || parseJsonBlob(err);
     if (json && (json.id || json.title || json.url || json.formats || json.entries)) {
       if (!json.formats && json.url) {
@@ -219,7 +259,7 @@ async function getDirectUrl(url, quality = 'best') {
   await getYtdlp();
   const { out, err } = await runYtdlp(
     [url, '-g', ...formatArgs(quality), ...extraArgs('info')],
-    { timeoutMs: 16000 },
+    { timeoutMs: 28000 },
   );
   const line = `${out}\n${err}`
     .split('\n')
@@ -232,9 +272,9 @@ async function getDirectUrl(url, quality = 'best') {
 function formatArgs(quality = 'best') {
   const q = String(quality || 'best').toLowerCase();
   if (q === 'fast' || q === 'sd' || q === 'worst') {
-    return ['-f', '18/b[height<=480][ext=mp4]/b[ext=mp4]/b'];
+    return ['-f', '18/b[height<=480][ext=mp4]/b[height<=480]/b[ext=mp4]/b'];
   }
-  return ['-f', '22/18/b[ext=mp4]/b'];
+  return ['-f', '22/18/b[ext=mp4]/best[acodec!=none]/b'];
 }
 
 module.exports = {
