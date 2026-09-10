@@ -139,8 +139,8 @@ async function extractMedia(rawUrl, quality = 'best') {
 
   const extractor = extractors[detected.platform] || extractors.generic;
   const result = await extractor(detected.url, { quality, platform: detected.platform });
-  if (!result || (!result.videoUrl && result.needsMerge !== true && result.platform)) {
-    /* still ok if ytdlp can fetch later */
+  if (!result?.videoUrl && !result?.needsMerge) {
+    throw ERRORS.EXTRACTION_FAILED();
   }
   const payload = {
     success: true,
@@ -161,7 +161,7 @@ async function extractMedia(rawUrl, quality = 'best') {
     httpHeaders: result.httpHeaders || {},
     sourceUrl: detected.url,
   };
-  cache.set(key, payload);
+  if (payload.videoUrl) cache.set(key, payload);
   return payload;
 }
 
@@ -266,8 +266,6 @@ function sendFileHeaders(res, data, size) {
 
 function pipeYtdlpStream(sourceUrl, quality, data, res) {
   return new Promise((resolve, reject) => {
-    sendFileHeaders(res, data, 0);
-    if (typeof res.flushHeaders === 'function') res.flushHeaders();
     const args = [sourceUrl, ...formatArgs(quality), '-o', '-', ...extraArgs('dl')];
     const child = spawn(ytdlpBin(), args, { windowsHide: true });
     let started = false;
@@ -279,7 +277,11 @@ function pipeYtdlpStream(sourceUrl, quality, data, res) {
       reject(err);
     };
     child.stdout.on('data', (chunk) => {
-      started = true;
+      if (!started) {
+        started = true;
+        sendFileHeaders(res, data, 0);
+        if (typeof res.flushHeaders === 'function') res.flushHeaders();
+      }
       if (!res.writableEnded) res.write(chunk);
     });
     child.stdout.on('end', () => {
@@ -345,14 +347,21 @@ async function pipeYtdlpFile(sourceUrl, quality, data, res) {
 
 async function pipeYtdlp(sourceUrl, quality, data, req, res) {
   try {
+    const direct = await getDirectUrl(sourceUrl, quality);
+    if (direct) {
+      data.videoUrl = direct;
+      data.needsMerge = false;
+      await pipeAxios(data, req, res);
+      return;
+    }
+  } catch {
+    /* stream / file next */
+  }
+  try {
     await pipeYtdlpStream(sourceUrl, quality, data, res);
   } catch (err) {
     if (res.headersSent) throw err;
-    const direct = await getDirectUrl(sourceUrl, quality);
-    if (!direct) throw err;
-    data.videoUrl = direct;
-    data.needsMerge = false;
-    await pipeAxios(data, req, res);
+    await pipeYtdlpFile(sourceUrl, quality, data, res);
   }
 }
 
@@ -398,8 +407,14 @@ app.get('/api/file', async (req, res, next) => {
     res.locals.inline = req.query.inline === '1' || req.query.preview === '1';
     const url = normalizeUrl(req.query.url);
     const quality = req.query.quality || 'best';
-    const data = await extractMedia(url, quality);
+    let data = await extractMedia(url, quality);
     data._quality = quality;
+
+    if (!canProxy(data) && !data.videoUrl) {
+      cache.del(cacheKey(data.sourceUrl || url));
+      data = await extractMedia(url, quality);
+      data._quality = quality;
+    }
 
     if (canProxy(data)) {
       try {
@@ -412,7 +427,7 @@ app.get('/api/file', async (req, res, next) => {
     await pipeYtdlp(data.sourceUrl, quality, data, req, res);
   } catch (err) {
     if (!res.headersSent) next(err);
-    else res.end();
+    else if (!res.writableEnded) res.end();
   }
 });
 
