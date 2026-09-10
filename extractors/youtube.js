@@ -2,15 +2,30 @@ const https = require('https');
 const axios = require('axios');
 const generic = require('./generic');
 const { extractFromInfo } = generic;
+const { resolveProxy } = require('../utils/ytdlp');
 
 const VR_VERSION = '1.65.10';
 const VR_UA = `com.google.android.apps.youtube.vr.oculus/${VR_VERSION} (Linux; U; Android 12L; eureka-user Build/SQ3A.220605.009.A1) gzip`;
 const ipv4Agent = process.platform === 'win32' ? undefined : new https.Agent({ family: 4, keepAlive: false });
 
+function proxyAgent() {
+  const proxy = resolveProxy();
+  if (!proxy) return null;
+  try {
+    const { SocksProxyAgent } = require('socks-proxy-agent');
+    const { HttpsProxyAgent } = require('https-proxy-agent');
+    if (/^socks/i.test(proxy)) return new SocksProxyAgent(proxy);
+    return new HttpsProxyAgent(proxy);
+  } catch {
+    return null;
+  }
+}
+
 function axOpts(extra = {}) {
+  const agent = proxyAgent() || ipv4Agent;
   return {
-    timeout: 8000,
-    ...(ipv4Agent ? { httpsAgent: ipv4Agent } : {}),
+    timeout: 12000,
+    ...(agent ? { httpsAgent: agent, httpAgent: agent, proxy: false } : {}),
     ...extra,
   };
 }

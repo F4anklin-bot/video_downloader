@@ -216,7 +216,7 @@ async function pipeAxios(data, req, res) {
     ...(data.httpHeaders || {}),
     'Accept-Encoding': 'identity',
   };
-  const upstream = await axios({
+  const axiosOpts = {
     method: 'get',
     url: data.videoUrl,
     responseType: 'stream',
@@ -226,7 +226,21 @@ async function pipeAxios(data, req, res) {
     maxContentLength: MAX_FILE_BYTES,
     decompress: false,
     validateStatus: (s) => s >= 200 && s < 400,
-  });
+  };
+  const proxy = require('./utils/ytdlp').resolveProxy?.();
+  if (proxy) {
+    try {
+      const { SocksProxyAgent } = require('socks-proxy-agent');
+      const { HttpsProxyAgent } = require('https-proxy-agent');
+      const agent = /^socks/i.test(proxy) ? new SocksProxyAgent(proxy) : new HttpsProxyAgent(proxy);
+      axiosOpts.httpsAgent = agent;
+      axiosOpts.httpAgent = agent;
+      axiosOpts.proxy = false;
+    } catch {
+      /* direct */
+    }
+  }
+  const upstream = await axios(axiosOpts);
 
   const length = Number(upstream.headers['content-length'] || data.filesize || 0);
   if (length && length > MAX_FILE_BYTES) throw ERRORS.FILE_TOO_LARGE();
@@ -366,11 +380,12 @@ async function pipeYtdlp(sourceUrl, quality, data, req, res) {
 }
 
 app.get('/api/health', (_req, res) => {
-  const { resolveCookies } = require('./utils/ytdlp');
+  const { resolveCookies, resolveProxy } = require('./utils/ytdlp');
   res.json({
     ok: true,
     name: "franklin's",
     cookies: Boolean(resolveCookies()),
+    proxy: Boolean(resolveProxy()),
   });
 });
 

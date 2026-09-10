@@ -23,6 +23,11 @@ const YT_CLIENTS_PRIMARY = 'tv,web_safari,web_embedded,android_vr';
 const YT_CLIENTS_FALLBACK = 'web_embedded,tv,web_safari';
 const YT_CLIENTS_WITH_COOKIES = 'web,mweb,tv,web_safari,web_embedded';
 
+function resolveProxy() {
+  const p = String(process.env.YTDLP_PROXY || '').trim();
+  return p || null;
+}
+
 function resolveCookies() {
   if (cookiesResolved) return cookiesFile;
   cookiesResolved = true;
@@ -159,6 +164,8 @@ function extraArgs(kind = 'dl', { youtubeClients } = {}) {
   if (ffmpeg) args.push('--ffmpeg-location', ffmpeg);
   const cookies = resolveCookies();
   if (cookies) args.push('--cookies', cookies);
+  const proxy = resolveProxy();
+  if (proxy) args.push('--proxy', proxy);
   const cacheDir = path.join(os.tmpdir(), 'franklins-ytdlp-cache');
   if (!fs.existsSync(cacheDir)) fs.mkdirSync(cacheDir, { recursive: true });
   args.push('--cache-dir', cacheDir);
@@ -300,6 +307,7 @@ module.exports = {
   formatArgs,
   getDirectUrl,
   resolveCookies,
+  resolveProxy,
   ytdlpBin,
   binPath,
   ffmpegPath,
