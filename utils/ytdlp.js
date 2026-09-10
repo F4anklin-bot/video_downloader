@@ -17,12 +17,15 @@ const ffmpegPath = path.join(binDir, ffmpegName);
 let instance = null;
 let ready = null;
 let cookiesFile = null;
+let cookiesResolved = false;
 
 const YT_CLIENTS_PRIMARY = 'tv,web_safari,web_embedded,android_vr';
 const YT_CLIENTS_FALLBACK = 'web_embedded,tv,web_safari';
+const YT_CLIENTS_WITH_COOKIES = 'web,mweb,tv,web_safari,web_embedded';
 
 function resolveCookies() {
-  if (cookiesFile) return cookiesFile;
+  if (cookiesResolved) return cookiesFile;
+  cookiesResolved = true;
   const filePath = process.env.YTDLP_COOKIES;
   if (filePath && fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
     cookiesFile = filePath;
@@ -30,16 +33,32 @@ function resolveCookies() {
   }
   let body = process.env.YTDLP_COOKIES_TXT || '';
   if (process.env.YTDLP_COOKIES_B64) {
-    body = Buffer.from(process.env.YTDLP_COOKIES_B64, 'base64').toString('utf8');
+    try {
+      body = Buffer.from(process.env.YTDLP_COOKIES_B64, 'base64').toString('utf8');
+    } catch {
+      /* keep TXT */
+    }
   }
-  body = String(body || '').replace(/\\n/g, '\n').trim();
-  if (body.length > 40) {
+  body = String(body || '')
+    .replace(/\\n/g, '\n')
+    .replace(/\\t/g, '\t')
+    .trim();
+  if (body.length > 40 && /youtube\.com/i.test(body)) {
     const dest = path.join(os.tmpdir(), 'franklins-cookies.txt');
-    fs.writeFileSync(dest, body);
+    if (!body.includes('# Netscape')) {
+      body = `# Netscape HTTP Cookie File\n${body}`;
+    }
+    fs.writeFileSync(dest, body.endsWith('\n') ? body : `${body}\n`);
     cookiesFile = dest;
     return cookiesFile;
   }
+  cookiesFile = null;
   return null;
+}
+
+function youtubeClientsFor(kind) {
+  if (resolveCookies()) return YT_CLIENTS_WITH_COOKIES;
+  return kind === 'fallback' ? YT_CLIENTS_FALLBACK : YT_CLIENTS_PRIMARY;
 }
 
 function ffmpegAsset() {
@@ -115,8 +134,9 @@ async function getYtdlp() {
   return ready;
 }
 
-function extraArgs(kind = 'dl', { youtubeClients = YT_CLIENTS_PRIMARY } = {}) {
+function extraArgs(kind = 'dl', { youtubeClients } = {}) {
   const info = kind === 'info';
+  const clients = youtubeClients || youtubeClientsFor(info ? 'primary' : 'primary');
   const args = [
     '--no-playlist',
     '--no-warnings',
@@ -130,7 +150,7 @@ function extraArgs(kind = 'dl', { youtubeClients = YT_CLIENTS_PRIMARY } = {}) {
     '--socket-timeout',
     info ? '15' : '20',
     '--extractor-args',
-    `youtube:player_client=${youtubeClients};skip=translated_subs`,
+    `youtube:player_client=${clients};skip=translated_subs`,
   ];
   if (!info) {
     args.push('--concurrent-fragments', '8', '--no-part', '--no-mtime');
@@ -139,7 +159,7 @@ function extraArgs(kind = 'dl', { youtubeClients = YT_CLIENTS_PRIMARY } = {}) {
   if (ffmpeg) args.push('--ffmpeg-location', ffmpeg);
   const cookies = resolveCookies();
   if (cookies) args.push('--cookies', cookies);
-  const cacheDir = path.join(binDir, 'cache');
+  const cacheDir = path.join(os.tmpdir(), 'franklins-ytdlp-cache');
   if (!fs.existsSync(cacheDir)) fs.mkdirSync(cacheDir, { recursive: true });
   args.push('--cache-dir', cacheDir);
   return args;
@@ -206,7 +226,9 @@ async function execJson(url, { quality = 'best' } = {}) {
       '-O',
       INFO_PRINT,
       '--no-progress',
-      ...extraArgs('info', { youtubeClients: YT_CLIENTS_FALLBACK }),
+      ...extraArgs('info', {
+        youtubeClients: resolveCookies() ? 'web,mweb,tv' : YT_CLIENTS_FALLBACK,
+      }),
     ],
     [
       url,
@@ -277,6 +299,7 @@ module.exports = {
   extraArgs,
   formatArgs,
   getDirectUrl,
+  resolveCookies,
   ytdlpBin,
   binPath,
   ffmpegPath,

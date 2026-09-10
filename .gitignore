@@ -4,3 +4,5 @@ bin/
 tmp/
 .DS_Store
 *.log
+*cookies*.txt
+www.youtube.com_cookies.txt

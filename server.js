@@ -366,7 +366,12 @@ async function pipeYtdlp(sourceUrl, quality, data, req, res) {
 }
 
 app.get('/api/health', (_req, res) => {
-  res.json({ ok: true, name: "franklin's" });
+  const { resolveCookies } = require('./utils/ytdlp');
+  res.json({
+    ok: true,
+    name: "franklin's",
+    cookies: Boolean(resolveCookies()),
+  });
 });
 
 app.get('/api/platforms', (_req, res) => {
