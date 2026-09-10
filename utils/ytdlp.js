@@ -165,6 +165,8 @@ function extraArgs(kind = 'dl', { youtubeClients } = {}) {
     info ? '20' : '25',
     '--extractor-args',
     extractorArgs,
+    '--js-runtimes',
+    'deno',
   ];
   if (!info) {
     args.push('--concurrent-fragments', '8', '--no-part', '--no-mtime');
