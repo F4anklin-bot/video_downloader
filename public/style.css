@@ -45,6 +45,7 @@
   --ring: 326.73;
   --safe-b: env(safe-area-inset-bottom, 0px);
   --safe-t: env(safe-area-inset-top, 0px);
+  --page-x: 28px;
 }
 
 html[data-theme="light"] {
@@ -75,6 +76,7 @@ html[data-theme="light"] {
 html[data-theme="dark"] { color-scheme: dark; }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
+[hidden] { display: none !important; }
 html, body { min-height: 100%; }
 html { background: var(--bg); transition: background 1.6s var(--ease), color 1.6s var(--ease); -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 body {
@@ -139,7 +141,7 @@ html.booting .app {
   z-index: 1;
   min-height: 100dvh;
   min-height: 100svh;
-  padding: calc(12px + var(--safe-t)) max(16px, env(safe-area-inset-right, 0px)) calc(92px + var(--safe-b)) max(16px, env(safe-area-inset-left, 0px));
+  padding: calc(28px + var(--safe-t)) max(var(--page-x), env(safe-area-inset-right, 0px)) calc(120px + var(--safe-b)) max(var(--page-x), env(safe-area-inset-left, 0px));
   transition: opacity 0.7s var(--ease), transform 0.7s var(--ease);
 }
 .boot {
@@ -227,7 +229,7 @@ html.booting .app {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 18px;
+  margin-bottom: 28px;
   min-height: 44px;
 }
 .rail-nav { display: none; }
@@ -416,7 +418,7 @@ html[data-theme="light"] .sun-rays {
   max-width: 36ch;
   font-size: 0.92rem;
   line-height: 1.45;
-  margin-bottom: 18px;
+  margin-bottom: 26px;
 }
 
 #view-home:has(.peek.has-result) .hero h1 {
@@ -528,8 +530,8 @@ html[data-theme="light"] .sun-rays {
   flex-wrap: nowrap;
   gap: 8px;
   list-style: none;
-  margin: 16px -16px 0;
-  padding: 0 16px 4px;
+  margin: 20px calc(-1 * var(--page-x)) 0;
+  padding: 0 var(--page-x) 4px;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
@@ -596,8 +598,8 @@ html[data-theme="light"] .sun-rays {
 }
 .preview-card {
   display: grid;
-  gap: 12px;
-  padding: 10px;
+  gap: 16px;
+  padding: 14px;
   border-radius: 22px;
   background: linear-gradient(180deg, var(--glass-2), var(--glass));
   border: 1px solid var(--line);
@@ -699,7 +701,7 @@ html[data-theme="light"] .sun-rays {
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
-.meta { padding: 2px 6px 6px; }
+.meta { padding: 8px 4px 4px; }
 .meta-top { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; }
 .quality-tag {
   font-size: 0.72rem;
@@ -746,10 +748,8 @@ html[data-theme="light"] .sun-rays {
   position: relative;
   overflow: hidden;
 }
-.dl-idle, .dl-progress, .dl-done {
-  display: inline-flex;
+.dl-idle, .dl-progress {
   align-items: center;
-  gap: 8px;
 }
 .ring { transform: rotate(-90deg); }
 .ring-bg, .ring-fg {
@@ -800,7 +800,7 @@ html[data-theme="light"] .sun-rays {
 
 .view { display: none; animation: rise 0.5s var(--ease); }
 .view.is-active { display: block; }
-.view-head { margin-bottom: 18px; }
+.view-head { margin-bottom: 22px; }
 .view-head h2 {
   font-family: var(--display);
   font-size: 1.7rem;
@@ -902,7 +902,7 @@ html[data-theme="light"] .sun-rays {
 .footnote { color: var(--faint); font-size: 0.75rem; padding: 8px 4px calc(8px + var(--safe-b)); }
 .footnote kbd { display: none; }
 
-.peek { display: block; margin-top: 16px; }
+.peek { display: block; margin-top: 22px; }
 .peek-empty { display: none; }
 .peek.is-away { display: none; }
 .peek:not(.has-result) { display: none; }
@@ -915,7 +915,7 @@ html[data-theme="light"] .sun-rays {
   z-index: 20;
   display: flex;
   gap: 4px;
-  padding: 6px max(8px, env(safe-area-inset-right, 0px)) calc(8px + var(--safe-b)) max(8px, env(safe-area-inset-left, 0px));
+  padding: 10px max(var(--page-x), env(safe-area-inset-right, 0px)) calc(14px + var(--safe-b)) max(var(--page-x), env(safe-area-inset-left, 0px));
   background: color-mix(in srgb, var(--bg) 78%, transparent);
   border-top: 1px solid var(--line-strong);
   backdrop-filter: blur(22px) saturate(1.4);
@@ -946,9 +946,9 @@ html[data-theme="light"] .sun-rays {
 
 .toasts {
   position: fixed;
-  top: calc(12px + var(--safe-t));
-  left: 16px;
-  right: 16px;
+  top: calc(16px + var(--safe-t));
+  left: var(--page-x);
+  right: var(--page-x);
   z-index: 40;
   display: grid;
   gap: 8px;
@@ -1054,7 +1054,6 @@ html[data-theme="light"] .sun-rays {
   .dock { display: none; }
   .field-icon { display: grid; place-items: center; color: var(--mute); flex: none; }
   .field-actions .platform-chip { display: inline-flex; }
-  .field:has(#clearBtn:not([hidden])) #pasteBtn { display: inline-flex; }
   .drop-hint, .desktop-only { display: block; }
   .composer {
     grid-template-columns: 1fr auto;

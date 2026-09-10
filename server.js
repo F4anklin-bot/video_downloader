@@ -232,8 +232,14 @@ async function pipeAxios(data, req, res) {
   if (length && length > MAX_FILE_BYTES) throw ERRORS.FILE_TOO_LARGE();
 
   res.status(200);
-  res.setHeader('Content-Type', upstream.headers['content-type'] || `video/${data.ext || 'mp4'}`);
-  res.setHeader('Content-Disposition', disposition(data.filename, res.locals.inline));
+  const inline = Boolean(res.locals.inline);
+  res.setHeader(
+    'Content-Type',
+    inline
+      ? upstream.headers['content-type'] || `video/${data.ext || 'mp4'}`
+      : 'application/octet-stream',
+  );
+  res.setHeader('Content-Disposition', disposition(data.filename, inline));
   res.setHeader('Cache-Control', 'no-store');
   if (length) res.setHeader('Content-Length', String(length));
   res.setHeader('X-Filename', encodeURIComponent(data.filename));
@@ -250,8 +256,9 @@ async function pipeAxios(data, req, res) {
 
 function sendFileHeaders(res, data, size) {
   res.status(200);
-  res.setHeader('Content-Type', `video/${data.ext || 'mp4'}`);
-  res.setHeader('Content-Disposition', disposition(data.filename, res.locals.inline));
+  const inline = Boolean(res.locals.inline);
+  res.setHeader('Content-Type', inline ? `video/${data.ext || 'mp4'}` : 'application/octet-stream');
+  res.setHeader('Content-Disposition', disposition(data.filename, inline));
   res.setHeader('Cache-Control', 'no-store');
   res.setHeader('X-Filename', encodeURIComponent(data.filename));
   if (size) res.setHeader('Content-Length', String(size));
@@ -259,6 +266,8 @@ function sendFileHeaders(res, data, size) {
 
 function pipeYtdlpStream(sourceUrl, quality, data, res) {
   return new Promise((resolve, reject) => {
+    sendFileHeaders(res, data, 0);
+    if (typeof res.flushHeaders === 'function') res.flushHeaders();
     const args = [sourceUrl, ...formatArgs(quality), '-o', '-', ...extraArgs('dl')];
     const child = spawn(ytdlpBin(), args, { windowsHide: true });
     let started = false;
@@ -270,10 +279,7 @@ function pipeYtdlpStream(sourceUrl, quality, data, res) {
       reject(err);
     };
     child.stdout.on('data', (chunk) => {
-      if (!started) {
-        started = true;
-        sendFileHeaders(res, data, 0);
-      }
+      started = true;
       if (!res.writableEnded) res.write(chunk);
     });
     child.stdout.on('end', () => {

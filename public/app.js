@@ -11,7 +11,6 @@ const PLATFORMS = [
   { id: 'twitch', name: 'Twitch', color: '#bf94ff', re: /twitch\.tv/i },
 ];
 
-const RING = 326.73;
 const $ = (id) => document.getElementById(id);
 
 const state = {
@@ -218,8 +217,9 @@ function renderPlatforms() {
 function updateChip(value) {
   const { platform } = detect(value);
   const chip = $('platformChip');
-  const clear = $('clearBtn');
-  clear.hidden = !value;
+  const hasUrl = Boolean(String(value || '').trim());
+  $('clearBtn').hidden = !hasUrl;
+  $('pasteBtn').hidden = hasUrl;
   if (!platform) {
     chip.hidden = true;
     return;
@@ -280,16 +280,12 @@ function resetDownloadUi() {
   btn.disabled = false;
   btn.querySelector('.dl-idle').hidden = false;
   btn.querySelector('.dl-progress').hidden = true;
-  btn.querySelector('.dl-done').hidden = true;
   $('transfer').hidden = true;
   $('transfer').classList.remove('is-indet');
 }
 
 function applyProgress(loaded, total, speed) {
   const pct = total ? Math.min(100, Math.round((loaded / total) * 100)) : null;
-  const offset = pct == null ? RING * 0.35 : RING * (1 - pct / 100);
-  $('ringFg').style.strokeDashoffset = String(offset);
-  $('dlPercent').textContent = pct == null ? '…' : `${pct}%`;
   $('transferFill').style.width = `${pct == null ? 32 : pct}%`;
   $('transfer').hidden = false;
   $('transfer').classList.toggle('is-indet', pct == null);
@@ -302,22 +298,13 @@ function markDownloading() {
   btn.disabled = true;
   btn.querySelector('.dl-idle').hidden = true;
   btn.querySelector('.dl-progress').hidden = false;
-  btn.querySelector('.dl-done').hidden = true;
 }
 
 function markDone() {
-  const btn = $('downloadBtn');
-  btn.disabled = false;
-  btn.querySelector('.dl-idle').hidden = true;
-  btn.querySelector('.dl-progress').hidden = true;
-  btn.querySelector('.dl-done').hidden = false;
-  $('ringFg').style.strokeDashoffset = '0';
-  $('transferFill').style.width = '100%';
   if (navigator.vibrate) navigator.vibrate([12, 40, 18]);
   burstConfetti();
   statsAdd(infoDuration());
-  if (statsGet().count === 5) toast('Cinq d’un coup. Franklin applaudit.');
-  setTimeout(resetDownloadUi, 1800);
+  resetDownloadUi();
 }
 
 async function analyze(url) {
@@ -453,6 +440,20 @@ function startPreview() {
   }
 }
 
+function startNativeDownload(url, filename) {
+  let a = $('nativeDl');
+  if (!a) {
+    a = document.createElement('a');
+    a.id = 'nativeDl';
+    a.rel = 'noopener';
+    a.style.cssText = 'position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)';
+    document.body.appendChild(a);
+  }
+  a.setAttribute('download', filename || 'video.mp4');
+  a.href = url;
+  a.click();
+}
+
 function downloadCurrent() {
   if (!state.info || state.downloading) return;
   stopPreview();
@@ -462,30 +463,20 @@ function downloadCurrent() {
   markDownloading();
   $('transfer').hidden = false;
   $('transfer').classList.add('is-indet');
-  $('dlPercent').textContent = '…';
-
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = info.filename || 'video.mp4';
-  a.rel = 'noopener';
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-
+  startNativeDownload(url, info.filename || 'video.mp4');
   historyPush({
     title: info.title,
     author: info.author,
     thumbnail: info.thumbnail,
     platform: info.platform,
     sourceUrl: state.sourceUrl,
-    filename: info.filename || 'video.mp4',
+    filename: info.filename,
     at: Date.now(),
   });
-  toast('Téléchargement lancé');
-  window.setTimeout(() => {
+  setTimeout(() => {
     state.downloading = false;
     markDone();
-  }, 900);
+  }, 2200);
 }
 
 function renderHistory() {
