@@ -38,7 +38,7 @@ function mapYtdlpError(err) {
   ) {
     return ERRORS.VIDEO_PRIVATE();
   }
-  if (msg.includes('404') || msg.includes('unavailable') || msg.includes('removed') || msg.includes('not found')) {
+  if (msg.includes('has been removed') || msg.includes('does not exist')) {
     return ERRORS.VIDEO_REMOVED();
   }
   if (msg.includes('429') || msg.includes('rate')) {
