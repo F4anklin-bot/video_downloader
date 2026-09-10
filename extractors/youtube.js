@@ -221,6 +221,17 @@ async function pipedInfo(id) {
 module.exports = async function extract(url, opts = {}) {
   const quality = opts.quality || 'best';
   const id = videoIdFromUrl(url);
+  const { resolveProxy } = require('../utils/ytdlp');
+  const hasProxy = Boolean(resolveProxy());
+
+  // With WARP/proxy, yt-dlp is the most reliable path on cloud IPs.
+  if (hasProxy) {
+    try {
+      return await generic(url, { ...opts, platform: 'youtube' });
+    } catch {
+      /* fall through to other methods */
+    }
+  }
 
   if (id) {
     for (const step of [innertubePlayer, pipedInfo]) {

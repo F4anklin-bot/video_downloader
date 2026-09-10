@@ -43,7 +43,7 @@ EOF
 
   if [ -f /tmp/wireproxy.pid ] && kill -0 "$(cat /tmp/wireproxy.pid)" 2>/dev/null; then
     echo "WARP SOCKS ready"
-    export YTDLP_PROXY="socks5://${SOCKS_HOST}:${SOCKS_PORT}"
+    export YTDLP_PROXY="socks5h://${SOCKS_HOST}:${SOCKS_PORT}"
     return 0
   fi
 

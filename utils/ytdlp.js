@@ -24,8 +24,13 @@ const YT_CLIENTS_FALLBACK = 'web_embedded,tv,web_safari';
 const YT_CLIENTS_WITH_COOKIES = 'web,mweb,tv,web_safari,web_embedded';
 
 function resolveProxy() {
-  const p = String(process.env.YTDLP_PROXY || '').trim();
-  return p || null;
+  let p = String(process.env.YTDLP_PROXY || '').trim();
+  if (!p) return null;
+  // DNS through proxy matters for YouTube on WARP
+  if (/^socks5:\/\//i.test(p) && !/^socks5h:\/\//i.test(p)) {
+    p = p.replace(/^socks5:\/\//i, 'socks5h://');
+  }
+  return p;
 }
 
 function resolveCookies() {
@@ -155,7 +160,7 @@ function extraArgs(kind = 'dl', { youtubeClients } = {}) {
     '--socket-timeout',
     info ? '15' : '20',
     '--extractor-args',
-    `youtube:player_client=${clients};skip=translated_subs`,
+    `youtube:player_client=${clients};player_skip=webpage,configs;skip=translated_subs`,
   ];
   if (!info) {
     args.push('--concurrent-fragments', '8', '--no-part', '--no-mtime');
