@@ -38,6 +38,20 @@ function mapYtdlpError(err) {
   ) {
     return ERRORS.VIDEO_PRIVATE();
   }
+  if (
+    msg.includes('sign in') ||
+    msg.includes('not a bot') ||
+    msg.includes('confirm you’re not') ||
+    msg.includes("confirm you're not") ||
+    msg.includes('login required') ||
+    msg.includes('cookies')
+  ) {
+    return new AppError(
+      'VIDEO_PRIVATE',
+      'YouTube bloque le serveur cloud. Ajoutez YTDLP_COOKIES_TXT dans Render (cookies YouTube).',
+      403,
+    );
+  }
   if (msg.includes('has been removed') || msg.includes('does not exist')) {
     return ERRORS.VIDEO_REMOVED();
   }
