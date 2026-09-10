@@ -21,7 +21,7 @@ let cookiesResolved = false;
 
 const YT_CLIENTS_PRIMARY = 'tv,web_safari,web_embedded,android_vr';
 const YT_CLIENTS_FALLBACK = 'web_embedded,tv,web_safari';
-const YT_CLIENTS_WITH_COOKIES = 'web,mweb,tv,web_safari,web_embedded';
+const YT_CLIENTS_WITH_COOKIES = 'web,mweb,tv,web_safari';
 
 function resolveProxy() {
   let p = String(process.env.YTDLP_PROXY || '').trim();
@@ -147,6 +147,10 @@ async function getYtdlp() {
 function extraArgs(kind = 'dl', { youtubeClients } = {}) {
   const info = kind === 'info';
   const clients = youtubeClients || youtubeClientsFor(info ? 'primary' : 'primary');
+  const hasCookies = Boolean(resolveCookies());
+  const extractorArgs = hasCookies
+    ? `youtube:player_client=${clients};skip=translated_subs`
+    : `youtube:player_client=${clients};player_skip=webpage,configs;skip=translated_subs`;
   const args = [
     '--no-playlist',
     '--no-warnings',
@@ -158,9 +162,9 @@ function extraArgs(kind = 'dl', { youtubeClients } = {}) {
     '--fragment-retries',
     info ? '1' : '2',
     '--socket-timeout',
-    info ? '15' : '20',
+    info ? '20' : '25',
     '--extractor-args',
-    `youtube:player_client=${clients};player_skip=webpage,configs;skip=translated_subs`,
+    extractorArgs,
   ];
   if (!info) {
     args.push('--concurrent-fragments', '8', '--no-part', '--no-mtime');

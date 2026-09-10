@@ -43,12 +43,18 @@ function mapYtdlpError(err) {
     msg.includes('not a bot') ||
     msg.includes('confirm you’re not') ||
     msg.includes("confirm you're not") ||
-    msg.includes('login required') ||
-    msg.includes('cookies')
+    msg.includes('login required')
   ) {
     return new AppError(
       'VIDEO_PRIVATE',
-      'YouTube bloque le serveur cloud. Ajoutez YTDLP_COOKIES_TXT dans Render (cookies YouTube).',
+      'YouTube bloque encore l’IP cloud. Un proxy résidentiel (YTDLP_PROXY) peut être nécessaire.',
+      403,
+    );
+  }
+  if (msg.includes('cookies') && !process.env.YTDLP_COOKIES_TXT && !process.env.YTDLP_COOKIES_B64) {
+    return new AppError(
+      'VIDEO_PRIVATE',
+      'YouTube bloque le serveur cloud. Ajoutez YTDLP_COOKIES_TXT dans Render.',
       403,
     );
   }
